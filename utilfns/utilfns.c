@@ -601,7 +601,7 @@ done:
 
 /*
  * prefix number match: we are given a string, a prefix separator
- * character, and a number.   the string is formatted as:
+ * character, and a non-negative number.   the string is formatted as:
  *
  *    [num-range-spec] [prefix-separator] [rest-of-string]
  *
@@ -628,45 +628,92 @@ done:
  * pointer points to the start of the string.
  */
 int prefix_num_match(char *str, int presep, int n, char **restp) {
-    int rv, start, end;
-    char *sp, *nxt, *dash;
+    int rv, range;
+    char *cp, *start, *end;
 
-    rv = -1;   /* assume no match */
-    for (sp = nxt = str ; *nxt && *nxt != presep ; sp = nxt) {
-        nxt = sp;
-        dash = NULL;
+    rv = -1;            /* assume no match */
+    cp = str;
+    if (restp)
+        *restp = str;   /* default is to not consume anything */
+    while (*cp && *cp != presep) {
+        range = 0;
+        start = end = NULL;
 
-        /* find next range, keeping note of first dash */
-        while (*nxt && *nxt != ',' && *nxt != presep) {
-            if (*nxt == '-' && dash == NULL)
-                dash = nxt;
-            nxt++;
+        /* get starting point, if specified */
+        if (isdigit(*cp)) {
+            start = cp++;
+            while (*cp && *cp != presep && *cp != '-' && *cp != ',' &&
+                   isdigit(*cp)) {
+                cp++;
+            }
         }
-        if (*nxt == ',')           /* skip comma */
-          nxt++;
-        if (dash)                  /* number past dash */
-          dash++;
 
-        if (!isdigit(*sp))         /* ignore invalid ranges */
+        /* is it a range? */
+        if (*cp == '-') {
+            range = 1;
+            cp++;
+        }
+
+        /* get ending point, if specified */
+        if (isdigit(*cp)) {
+            end = cp++;
+            while (*cp && *cp != presep && *cp != ',' && isdigit(*cp)) {
+                cp++;
+            }
+        }
+
+        /* ensure we are at the end */
+        if (*cp && (*cp != ',' && *cp != presep)) {
+            return(0);
+        }
+
+        /* consume the comma at the end  */
+        if (*cp == ',')
+            cp++;
+
+
+        /* no numbers specified? */
+        if (start == NULL && end == NULL) {
+            if (range)       /* disallow a lone '-' without digits */
+                return(0);
+            continue;        /* allow empty num-range-spec, just skip over */
+        }
+
+        /* for non-range, just match the start */
+        if (!range) {
+            if (atoi(start) == n)
+                rv = 1;
             continue;
-        start = end = atoi(sp);
+        }
 
-        if (dash && isdigit(*dash))
-            end = atoi(dash);
+        /* start without an end... "5-" means anything >= start */
+        if (end == NULL) {
+            if (n >= atoi(start))
+                rv = 1;
+            continue;
+        }
 
-        if (n == start || (n >= start && n <= end))
-            rv = 1;                /* got a match! */
+        /* end without a start... "-5" means anything <= end */
+        if (start == NULL) {
+            if (n <= atoi(end))
+                rv = 1;
+            continue;
+        }
+
+        /* full range */
+        if (n >= atoi(start) && n <= atoi(end))
+            rv = 1;
+
+        /* even if we get a match, parse to end to check for syntax errs */
     }
 
-    /* presep set but not found: no num-range-spec given, ret 0 */
-    if (presep != '\0' && *nxt == '\0') {
-        if (restp)
-            *restp = str;
+    /* ensure we hit presep if one was given */
+    if (presep && *cp != presep) {
         return(0);
     }
 
     if (restp)
-        *restp = (presep) ? nxt + 1 : nxt;   /* skip presep if set */
+        *restp = (presep) ? cp + 1 : cp;
 
     return(rv);
 }
