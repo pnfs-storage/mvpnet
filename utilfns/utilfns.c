@@ -572,7 +572,7 @@ int cmdpathok(char *cmd) {
     /* set known state so we can go to done */
     path = tmpbuf = NULL;
     rv = -1;
-    
+
     p = getenv("PATH");
     pathlen = (p) ? strlen(p) : 0;
     if (pathlen == 0)                /* no meaningful path? */
@@ -612,7 +612,7 @@ done:
  * prefix-separator cannot be a digit, a dash, or a comma.)
  *
  * if we have a num-range-spec, we match the number we are
- * given to it.   a num-range-spec is an unsorted set of 
+ * given to it.   a num-range-spec is an unsorted set of
  * comma separated number ranges (ranges are inclusive).
  * example number spec prefixes:
  *     "1"  "32"  "15,7"  "7-9,20,1-3"
@@ -760,7 +760,7 @@ char *loadfile(char *file, off_t *szp) {
     ssize_t got;
 
     /* open file, get size, malloc buf */
-    if ( (fd = open(file, O_RDONLY)) < 0 || 
+    if ( (fd = open(file, O_RDONLY)) < 0 ||
          fstat(fd, &st) < 0 ||
          (b = malloc(st.st_size + 1)) == NULL )
         goto done;
@@ -861,7 +861,7 @@ void strvec_free(struct strvec *sv) {
         free(sv->lens);
         sv->lens = NULL;
     }
-  
+
     sv->nalloc = sv->nused = 0;
     sv->nbytes = 0;
 }
@@ -908,11 +908,11 @@ int strvec_append(struct strvec *sv, ...) {
         want = sv->nalloc + (cnt - (sv->nalloc - sv->nused)) + 16;
         newv = realloc(sv->base, sizeof(*sv->base) * want);
         if (!newv)
-            return(-1);    
+            return(-1);
         sv->base = newv;
         newl = realloc(sv->lens, sizeof(*sv->lens) * want);
         if (!newl)
-            return(-1);    
+            return(-1);
         sv->lens = newl;
         sv->nalloc = want;
         if (cnt > sv->nalloc - sv->nused)
@@ -989,8 +989,42 @@ char *strvec_flatten(struct strvec *sv, char *prefix, char *sep,
     if (slen)
         p = (char *)memcpy(p, suffix, slen) + slen;
     *p = '\0';
-  
+
     return(rv);
+}
+
+/*
+ * search null terminated string vector (e.g. like strvec's base[])
+ * for a target string (or a prefix of it).   return index of first
+ * match or -1 if there was no match.
+ */
+int vec_search(char *target, int targterm, char **sarray) {
+    char *tp;
+    int len, lcv;
+
+    if (!sarray)
+        return(-1);     /* nothing to search, so no match */
+
+    if (targterm) {     /* given a target prefix term char?  use strncmp() */
+
+        tp = strchr(target, targterm);
+        if (!tp)
+            return(-1);   /* given target did not have term char... */
+        len = (tp - target) + 1;
+        for (lcv = 0 ; sarray[lcv] != NULL ; lcv++) {
+            if (strncmp(target, sarray[lcv], len) == 0)
+                return(lcv);
+        }
+
+    } else {
+
+        for (lcv = 0 ; sarray[lcv] != NULL ; lcv++) {
+            if (strcmp(target, sarray[lcv]) == 0)
+                return(lcv);
+        }
+    }
+
+    return(-1);
 }
 
 /*

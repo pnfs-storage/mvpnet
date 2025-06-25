@@ -100,9 +100,10 @@ void selmax(int *current, int count, ...);
 char *strdupl(const char *str, size_t *lenp);
 size_t strgen(char **newstr, ...);
 int strvec_append(struct strvec *sv, ...);
-char *strvec_flatten(struct strvec *sv, char *prefix, char *sep, 
+char *strvec_flatten(struct strvec *sv, char *prefix, char *sep,
                      char *suffix);
 void strvec_free(struct strvec *sv);
 int twaitpid(struct timeval *tvwait, int pidspec, int *status);
+int vec_search(char *target, int targterm, char **sarray);
 
 #endif /* _UTILFNS_H_ */
