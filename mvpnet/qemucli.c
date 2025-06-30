@@ -39,6 +39,8 @@
  * file.
  */
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +50,300 @@
 
 #include "mvp_mlog.h"
 #include "qemucli.h"
+
+/*
+ * parse qemu-style "argval,prop1=propval1,prop2=propva2,..." args.
+ * argval may be omitted (so there is just a list of property values).
+ * values end with a comma or a null.  we support pulling out
+ * user-defined properties into their own list.  we also support
+ * adding default property values to the list (if they were not
+ * present in the input arg).
+ *
+ * XXX: unlike qemu, we currently do not support commas in values with
+ * the double comma trick.
+ *
+ * return 0 on success, -1 on failure.
+ * on success, caller must free *argval, props, and pulls.
+ */
+static int qemucli_procarg(char *arg, char **argval, char **pullouts,
+                           char **defaults, struct strvec *props,
+                           struct strvec *pulls) {
+    char *ap0, *prop, *eq, *val, *endp, *nxtp;
+    int goterr, lcv;
+    struct strvec *addto;
+
+    *argval = NULL;
+    *props = STRVEC_INIT;
+    *pulls = STRVEC_INIT;
+
+    for (ap0 = arg, goterr = 0 ; !goterr && *ap0 != '\0' ; ap0 = nxtp) {
+
+        /* parse the next entry */
+        prop = eq = NULL;
+        val = ap0;          /* could be argval (if val==arg) or prop=propval */
+
+        while (*val && *val != ',' && *val != '=')  /* find end of val */
+            val++;
+
+        if (*val != '=') {                         /* it's an argval */
+            endp = val;
+            val = ap0;
+        } else {                                   /* it's a propval */
+            prop = ap0;
+            eq = val;
+            val++;
+            endp = val;
+            while (*endp && *endp != ',')          /* find end of propval */
+                endp++;
+        }
+        nxtp = (*endp == ',') ? endp + 1 : endp;   /* start for next loop */
+        /* parse complete */
+
+        /* only one argval allowed and it must be at the start of arg */
+        if (eq == NULL && val != arg) {
+            mlog(MVP_CRIT, "qemucli_progarg: bad prop=val: '%.*s'",
+                    (int)(endp - val), val);
+            goterr++;
+            continue;
+        }
+
+        /* temporarily null out end points (will be restored) */
+        if (eq)
+            *eq = '\0';
+        if (endp != nxtp)
+            *endp = '\0';
+
+        if (eq == NULL) {                          /* handle argval */
+            *argval = strdup(val);
+            if (*argval == NULL) {
+                mlog(MVP_CRIT, "qemucli_progarg: argval strdup failed");
+                goterr++;
+            }
+        } else {                                   /* handle propval */
+            /* determine which strvec to append it to */
+            addto = (vec_search(prop, 0, pullouts) != -1) ? pulls : props;
+            *eq = '=';     /* restore equal now */
+            if (strvec_append(addto, prop, NULL) != 0) {
+                mlog(MVP_CRIT, "prop/val append malloc fail");
+                goterr++;
+            }
+        }
+
+        /* restore endpoint (eq already restored above) */
+        if (endp != nxtp)
+            *endp = ',';
+    }
+
+    /* add in any defaults to props that did not get an override */
+    for (lcv = 0 ; defaults && defaults[lcv] != NULL ; lcv++) {
+        if (vec_search(defaults[lcv], '=', props->base) == -1) {
+            if (strvec_append(props, defaults[lcv], NULL) != 0) {
+                mlog(MVP_CRIT, "default add failed");
+                goterr++;
+                break;
+            }
+        }
+    }
+
+    if (goterr) {
+        if (*argval) {
+            free(*argval);
+            *argval = NULL;
+        }
+        strvec_free(props);
+        strvec_free(pulls);
+    }
+    return((goterr) ? -1 : 0);
+}
+
+/*
+ * apply mvpctl processing to a single image file and append its
+ * corresponding storage config info to the qemu command line
+ * vector.
+ *
+ * return 0 on success, -1 on failure.
+ */
+static int qemucli_storage_img(struct strvec *qvec, char *jobtag,
+                               char *ranktag, char *img, char *rundir,
+                               struct strvec *tmps, char *mvpctl,
+                               struct strvec *mains) {
+    int rv = -1;   /* assume failure */
+    char *img_extdot, *dot, *ext, *image_file, *runimage_file, *cp;
+    char *boot_image, *mainargs, *driveargs;
+
+    /* first generate filenames as-per mvpctl settings */
+    img_extdot = strrchr(img, '.');    /* look for ending extension */
+    if (img_extdot == NULL) {          /* no extension? */
+        dot = "";
+        ext = "";
+    } else {
+        dot = ".";
+        ext = img_extdot + 1;
+        *img_extdot = '\0';            /* overwrite '.' in img */
+    }
+    image_file = runimage_file = NULL;
+    mainargs = driveargs = NULL;
+
+    if (strgen(&image_file, img,
+               (strchr(mvpctl, 'J')) ? jobtag : "",
+               (strchr(mvpctl, 'R')) ? ranktag : "", dot, ext, NULL) < 1) {
+        mlog(MVP_CRIT, "strgen: image_file");
+        goto done;
+    }
+
+    if (strchr(mvpctl, 'c') != NULL) {
+        if (rundir == NULL) {
+            mlog(MVP_ERR, "qemucli: mvpctl 'c' given, but no rundir!");
+            goto done;
+        }
+        cp = strrchr(img, '/');        /* get just filename from img */
+        cp = (cp) ? cp + 1 : img;      /* skip the '/' if present */
+
+        if (strgen(&runimage_file, rundir, "/", cp,
+                   (strchr(mvpctl, 'j')) ? jobtag : "",
+                   (strchr(mvpctl, 'r')) ? ranktag : "", dot, ext, NULL) < 1) {
+            mlog(MVP_CRIT, "strgen: runimage_file");
+            goto done;
+        }
+    }
+
+    /* if we have a runimage_file, we try and copy the image there */
+    if (runimage_file) {
+        if (copyfile(image_file, runimage_file, O_CREAT|O_EXCL) < 0) {
+            /*
+             * allow EEXIST -- assume some other proc has already
+             * copied the file for us.  we'll just use that copy.
+             */
+            if (errno != EEXIST) {
+                mlog(MVP_ERR, "copyfile: %s to %s (%s)", image_file,
+                    runimage_file, strerror(errno));
+                goto done;
+            }
+            mlog(MVP_NOTE, "copyfile(%s => %s) - file already present",
+                 image_file, runimage_file);
+        } else {
+            mlog(MVP_NOTE, "copyfile(%s => %s) - success!",
+                 image_file, runimage_file);
+        }
+        if (strchr(mvpctl, 'd') &&
+            strvec_append(tmps, runimage_file, NULL) != 0) {
+            mlog(MVP_CRIT, "tmps runimage_file failed");
+            goto done;
+        }
+    }
+
+    /* register image_file for removal if requested */
+    if (strchr(mvpctl, 'D') && strvec_append(tmps, image_file, NULL) != 0) {
+        mlog(MVP_CRIT, "tmps image_file failed");
+        goto done;
+    }
+
+    /* generate qemu -drive arg for this image */
+    boot_image = (runimage_file) ? runimage_file : image_file;
+
+    if (mains->nused) {
+        mainargs = strvec_flatten(mains, ",", ",", NULL);
+        if (!mainargs) {
+            mlog(MVP_CRIT, "mainargs alloc failed");
+            goto done;
+        }
+    }
+
+    if (strgen(&driveargs, "file=", boot_image,
+               (strchr(mvpctl, 'p')) ? ",read-only=on" : "",
+               (strchr(mvpctl, 's')) ? ",snapshot=on" : "",
+               (mainargs) ? mainargs : "", NULL)  < 1) {
+        mlog(MVP_CRIT, "driveargs alloc failed");
+        goto done;
+    }
+
+    if (strvec_append(qvec, "-drive", driveargs, NULL) != 0) {
+        mlog(MVP_CRIT, "drive qvec append alloc failed");
+        goto done;
+    }
+
+    /* success! */
+    rv = 0;
+
+done:
+    if (img_extdot)
+        *img_extdot = '.';             /* restore '.' in img */
+    if (image_file)
+        free(image_file);
+    if (runimage_file)
+        free(runimage_file);
+    if (mainargs)
+        free(mainargs);
+    if (driveargs)
+        free(driveargs);
+    return(rv);
+}
+
+/*
+ * append storage config to qemu command line vector.
+ * return 0 on success, -1 on failure.
+ */
+static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
+                               char *ranktag, struct strvec *imgs,
+                               char *rundir, struct strvec *tmps) {
+    static char *pullout[] = { "mvpctl", NULL };
+    static char *defaults[] = { "media=disk", "if=virtio", NULL };
+    int lcv, rv;
+    char *argval, *mvpctl;
+    struct strvec mains, pulls;
+
+    /* process each -i in order given */
+    for (lcv = 0 ; imgs->base[lcv] != NULL ; lcv++) {
+        rv = qemucli_procarg(imgs->base[lcv], &argval, pullout,
+                             defaults, &mains, &pulls);
+        if (rv == -1)
+            return(rv);      /* mloged elsewhere */
+
+        /*
+         * if there is no argval in the current "-i" then it means
+         * that the user wants to pass everything through as-is
+         * to qemu's -device flag without any mvpctl processing by us.
+         */
+        if (argval == NULL) {
+            rv = (pulls.nused == 0) ? 0 : -1;  /* ensure no mvpctl */
+            strvec_free(&mains);
+            strvec_free(&pulls);
+            if (rv == -1) {
+                mlog(MVP_ERR, "mvpctl on qemu passthru: %s", imgs->base[lcv]);
+                return(-1);
+            }
+            if (strvec_append(qvec, "-device", imgs->base[lcv], NULL) != 0) {
+                mlog(MVP_CRIT, "malloc/append to qvec failed!");
+                return(-1);
+            }
+            continue;
+        }
+
+        /*
+         * argval is an image filename that we will apply mvpctl to
+         * before adding the info to qvec.  determine mvpctl to use.
+         */
+        if (pulls.nused == 0) {   /* no mvpctl provided by user? */
+            mvpctl = (rundir == NULL) ? "" : "cjrd";
+        } else {
+            mvpctl = pulls.base[0];   /* need to skip over 'mvpopts=' */
+            while (*mvpctl && *mvpctl != '=')
+                mvpctl++;
+            if (*mvpctl == '=')       /* skip the '=' too */
+                mvpctl++;
+        }
+
+        rv = qemucli_storage_img(qvec, jobtag, ranktag, argval,
+                                 rundir, tmps, mvpctl, &mains);
+        free(argval);
+        strvec_free(&mains);
+        strvec_free(&pulls);
+        if (rv == -1)
+            return(rv);               /* logged elsewhere */
+    }
+
+    return(0);
+}
 
 /*
  * append socknet config to qemu command line vector.
@@ -234,13 +530,9 @@ done:
  * we build the command line argv[] array in a strvec.
  * we will error out on failure...
  */
-void qemucli_gen(struct qemucli_args *qa, struct strvec *qvec) {
-    char *bootdrive, mbuf[32];
-
-    /* generate bootdrive option string */
-    if (strgen(&bootdrive, "file=", qa->bootimg,
-               ",media=disk,if=virtio", NULL) < 1)
-        mlog_exit(1, MVP_CRIT, "strgen: bootdrive");
+void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
+                 struct strvec *qvec) {
+    char mbuf[32];
 
     /* start command line with wrapper and its args */
     if (strvec_append(qvec, qa->mopt->monwrap, NULL) != 0)
@@ -258,11 +550,15 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *qvec) {
     if (qa->mopt->kvm && strvec_append(qvec, "-enable-kvm", NULL) != 0)
         mlog_exit(1, MVP_CRIT, "qemuvec setup kvm");
 
-    /* guest memory size and bootdrive */
+    /* guest memory size */
     snprintf(mbuf, sizeof(mbuf), "%dM", qa->mopt->mem_mb);
-    if (strvec_append(qvec, "-m", mbuf,
-                       "-drive", bootdrive, NULL) != 0)
-        mlog_exit(1, MVP_CRIT, "qemuvec setup bootdrive");
+    if (strvec_append(qvec, "-m", mbuf, NULL) != 0)
+        mlog_exit(1, MVP_CRIT, "qemuvec setup memory");
+
+    /* storage configuration */
+    if (qemucli_storage_cfg(qvec, qa->jobtag, qa->ranktag, &qa->mopt->image,
+                            qa->mopt->rundir, tmps) != 0)
+        mlog_exit(1, MVP_CRIT, "qemuvec setup storage");
 
     /* usernet configuration */
     if (qemucli_usernet_cfg(qvec, qa->mi.rank, &qa->mopt->domain,
@@ -275,7 +571,6 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *qvec) {
         mlog_exit(1, MVP_CRIT, "qemuvec setup socknet");
 
     /*
-     * done!  we can free bootdrive since it was copied into qvec.
+     * done!
      */
-    free(bootdrive);
 }

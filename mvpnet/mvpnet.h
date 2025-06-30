@@ -50,8 +50,7 @@ struct mvpopts {
     char *defpri_ml;       /* default mlog priority */
     struct strvec domain;  /* domain(s) for resolver */
     int gstats;            /* do global stat dump at rank 0 */
-    char *image;           /* image to load */
-    char *imagectl;        /* image control flags */
+    struct strvec image;   /* images to load */
     char *jobname;         /* batch job name/id (if any) */
     int kvm;               /* use kvm when running qemu */
     char *logdir;          /* directory put log files */
@@ -61,7 +60,6 @@ struct mvpopts {
     int nettype;           /* type of local socket to use for qemu network */
     char *qemucmd;         /* qemu command */
     char *rundir;          /* runtime directory to copy image to */
-    char *runctl;          /* runtime image control flags */
     char *sockdir;         /* directory to put sockets in */
     char *tftpdir;         /* tftp dir (enables tftpd) */
     char *username;        /* username to login to on guest */
@@ -74,8 +72,8 @@ struct mvpopts {
 #define MVPOPTS_INIT                                                           \
     (struct mvpopts) {                                                         \
         .bufsz_ml = 4096, .defpri_ml = "WARN", .domain = STRVEC_INIT,          \
-        .imagectl = "", .kvm = 1, .logdir = "/tmp", .mem_mb = 4096,            \
-        .monwrap = "monwrap", .runctl = "jrd", .nettype = SOCK_STREAM,         \
+        .image = STRVEC_INIT, .kvm = 1, .logdir = "/tmp", .mem_mb = 4096,      \
+        .monwrap = "monwrap", .nettype = SOCK_STREAM,                          \
         .qemucmd = "qemu-system-x86_64", .sockdir = "/tmp",                    \
         .stderrpri_ml = "CRIT"                                                 \
     }

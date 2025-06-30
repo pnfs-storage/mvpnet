@@ -181,9 +181,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-D [pri]   *mlog default priority (def=%s)\n",
             defs.defpri_ml);
     fprintf(stderr, "\t-g          have rank0 dump global stats to file\n");
-    fprintf(stderr, "\t-i [img]    image to load\n");
-    fprintf(stderr, "\t-I [ctl]    image file jrd control flags (def='%s')\n",
-            defs.imagectl);
+    fprintf(stderr, "\t-i [img]   *image spec to load\n");
     fprintf(stderr, "\t-j [id]     job id/name (added to log/socket names)\n");
     fprintf(stderr, "\t-k [val]    kvm on (1) or off (0) (def=%d)\n", defs.kvm);
     fprintf(stderr, "\t-l [dir]    log file directory (def=%s)\n", defs.logdir);
@@ -196,8 +194,6 @@ void usage(char *prog, int rank) {
             (defs.nettype == SOCK_STREAM) ? "stream" : "dgram");
     fprintf(stderr, "\t-q [qemu]   qemu command (def=%s)\n", defs.qemucmd);
     fprintf(stderr, "\t-r [dir]    run dir to copy image to (def=none)\n");
-    fprintf(stderr, "\t-R [ctl]    runtime image file jrd control flags "
-                    "(def='%s')\n", defs.runctl);
     fprintf(stderr, "\t-s [dir]    socket directory (def=%s)\n", defs.sockdir);
     fprintf(stderr, "\t-S [pri]    mlog stderr priority (def=%s)\n",
             defs.stderrpri_ml);
@@ -210,15 +206,25 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "note: options marked with '*' can be prefixed with\n");
     fprintf(stderr, "      a rank spec (e.g. '-D 0,4-9:ERR') to limit\n");
     fprintf(stderr, "      the ranks the option is applied to\n");
-    fprintf(stderr, "note: we either run directly from image file (-i)\n");
-    fprintf(stderr, "      or if -r is set, we copy it to the rundir\n");
-    fprintf(stderr, "      and run it from there.\n");
+    fprintf(stderr, "note: by default we run '-i' images directly\n");
+    fprintf(stderr, "      unless '-r' is set.  if '-r' is set we copy\n");
+    fprintf(stderr, "      images to rundir and run from there.\n");
+    fprintf(stderr, "note: use additional '-i' flags to add more images\n");
     fprintf(stderr, "note: use additional '-d' flags to add more domains\n");
-    fprintf(stderr, "note: jrd image control flags are:\n");
-    fprintf(stderr, "\tj - tag file with job id (from -j, if set)\n");
-    fprintf(stderr, "\tr - tag file with MPI rank\n");
-    fprintf(stderr, "\td - try and delete file when we exit\n");
-
+    fprintf(stderr, "note: '-i' uses qemu '-drive' cmd format but takes an\n");
+    fprintf(stderr, "      an additional mvpctl= set of flag values:\n");
+    fprintf(stderr, "\tc - copy image to rundir (-r must be set)\n");
+    fprintf(stderr, "\tj - add job to filename in rundir\n");
+    fprintf(stderr, "\tr - add rank to filename in rundir\n");
+    fprintf(stderr, "\td - remove image from rundir at exit\n");
+    fprintf(stderr, "\tJ - add job to image filename (-i)\n");
+    fprintf(stderr, "\tR - add rank to image filename (-i)\n");
+    fprintf(stderr, "\tD - remove image (-i) at exit\n");
+    fprintf(stderr, "\tp - write-protect image file (read-only=on)\n");
+    fprintf(stderr, "\ts - open file in snapshot mode (snapshot=on)\n");
+    fprintf(stderr, "note: default mvpctl is 'cjrd' if '-r' is set\n");
+    fprintf(stderr, "       otherwise the default is '' if '-r' is not set\n");
+    fprintf(stderr, "example: '-i foo.img,mvpctl=s' run direct w/snapshot\n");
     exit(1);
 }
 
@@ -235,7 +241,7 @@ int main(int argc, char **argv) {
     /* tags, filenames, and command line related stuff */
     char *jobtag, ranktag[32], *mlog_log, *console_log, *gstats_log,
          *wrapper_log;
-    char *socknames[2], *img_base, *img_ext, *image_file, *runimage_file;
+    char *socknames[2];
     int stride, localport;
     struct qemucli_args qcliargs = { 0 };
     struct strvec qemuvec = STRVEC_INIT;  /* qemu execp() args */
@@ -263,7 +269,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:d:D:ghi:I:j:k:l:L:m:M:n:q:r:R:s:S:t:u:w:X:")) != -1) {
+                 "B:c:d:D:ghi:j:k:l:L:m:M:n:q:r:s:S:t:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -307,10 +313,11 @@ int main(int argc, char **argv) {
             mopt.gstats = 1;
             break;
         case 'i':
-            mopt.image = optarg;
-            break;
-        case 'I':
-            mopt.imagectl = optarg;
+            match = prefix_num_match(optarg, ':', mii.rank, &optrest);
+            if (match >= 0) {
+                if (strvec_append(&mopt.image, optrest, NULL) == -1)
+                    rmerror(mii.rank, match, "unable to append imagename");
+            }
             break;
         case 'j':
             mopt.jobname = optarg;
@@ -378,9 +385,6 @@ int main(int argc, char **argv) {
             if (dirok(mopt.rundir) < 0)
                 err(1, "rundir: %s", mopt.rundir);
             break;
-        case 'R':
-            mopt.runctl = optarg;
-            break;
         case 's':
             mopt.sockdir = optarg;
             if (dirok(mopt.sockdir) < 0)
@@ -442,8 +446,8 @@ int main(int argc, char **argv) {
     if (argc != 1)
         usage(prog, mii.rank);
 
-    if (mopt.image == NULL)
-        rmerror(mii.rank, 0, "image must be specified with -i");
+    if (mopt.image.nused == 0)
+        rmerror(mii.rank, 1, "images must be specified with -i");
     if (cmdpathok(mopt.monwrap) < 0)
         errx(1, "bad monwarp prog: %s", mopt.monwrap);
     if (cmdpathok(mopt.qemucmd) < 0)
@@ -531,35 +535,6 @@ int main(int argc, char **argv) {
             mlog_exit(1, MVP_CRIT, "strgen: sockdir");
     }
 
-    /* image file names */
-    img_base = mopt.image;
-    img_ext = strrchr(img_base, '.');
-    if (img_ext == NULL) {
-        img_ext = "";
-    } else {
-        *img_ext++ = '\0';   /* overwrite '.' in mopt.image */
-    }
-    if (strgen(&image_file, img_base,
-               (strchr(mopt.imagectl, 'j')) ? jobtag : "",
-               (strchr(mopt.imagectl, 'r')) ? ranktag : "",
-               (*img_ext) ? "." : "", img_ext, NULL) < 1)
-        mlog_exit(1, MVP_CRIT, "strgen: image_file");
-    if (mopt.rundir == NULL) {
-        runimage_file = NULL;
-    } else {
-        cp = strrchr(img_base, '/');  /* get just filename from img_base */
-        if (cp) {
-            cp++;
-        } else {
-            cp = img_base;
-        }
-        if (strgen(&runimage_file, mopt.rundir, "/", cp,
-                   (strchr(mopt.runctl, 'j')) ? jobtag : "",
-                   (strchr(mopt.runctl, 'r')) ? ranktag : "",
-                   (*img_ext) ? "." : "", img_ext, NULL) < 1)
-            mlog_exit(1, MVP_CRIT, "strgen: runimage_file");
-    }
-
     /* determine max local size to help pick ssh forward port */
     if ((stride = mpimaxlocalsize(MPI_COMM_WORLD)) == -1)   /* collective! */
         errx(1, "mpimaxlocalsize failed");
@@ -580,11 +555,12 @@ int main(int argc, char **argv) {
     /* now we can build our qemu command line */
     qcliargs.mopt = &mopt;
     qcliargs.mi = mii;        /* struct copy */
+    qcliargs.jobtag = jobtag;
+    qcliargs.ranktag = ranktag;
     qcliargs.localport = localport;
     qcliargs.wraplog = wrapper_log;
-    qcliargs.bootimg = (runimage_file) ? runimage_file : image_file;
     qcliargs.socknames = socknames;
-    qemucli_gen(&qcliargs, &qemuvec);
+    qemucli_gen(&qcliargs, &g.tmps, &qemuvec);
 
     /* log the config */
     mlog(MVP_NOTE, "config for rank %d:", mii.rank);
@@ -596,9 +572,8 @@ int main(int argc, char **argv) {
     mlog(MVP_NOTE, "socknames[0]: %s", socknames[0]);
     if (socknames[1])
         mlog(MVP_NOTE, "socknames[1]: %s", socknames[1]);
-    mlog(MVP_NOTE, "image_file: %s", image_file);
     if (mopt.rundir)
-        mlog(MVP_NOTE, "runimage_file: %s", runimage_file);
+        mlog(MVP_NOTE, "rundir: %s", mopt.rundir);
     mlog(MVP_NOTE, "localport: %d", localport);
     if (qemuvec.base == NULL) {
         mlog(MVP_NOTE, "qemuvec: <null>");
@@ -609,22 +584,6 @@ int main(int argc, char **argv) {
         }
         mlog(MVP_NOTE, "qemuvec[%d]: NULL", lcv);
     }
-
-    /* if we have a rundir, we copy the image there */
-    if (runimage_file) {
-        if (copyfile(image_file, runimage_file) < 0) {
-            mlog_exit(1, MVP_ERR, "copyfile: %s to %s (%s)", image_file,
-                runimage_file, strerror(errno));
-        }
-        if (strchr(mopt.runctl, 'd') &&
-            strvec_append(&g.tmps, runimage_file, NULL) != 0)
-            mlog_exit(1, MVP_CRIT, "g.tmps runimage_file failed");
-    }
-
-    /* register image_file for removal if requested */
-    if (strchr(mopt.imagectl, 'd') &&
-        strvec_append(&g.tmps, image_file, NULL) != 0)
-        mlog_exit(1, MVP_CRIT, "g.tmps image_file failed");
 
     /* create console log if enabled */
     if (console_log) {

@@ -41,12 +41,14 @@
 struct qemucli_args {
     struct mvpopts *mopt;      /* mvpnet command line options */
     struct mpiinfo mi;         /* copy of mpi info */
+    char *jobtag;              /* job tag (for image mgt) */
+    char *ranktag;             /* rank tag (for image mgt) */
     int localport;             /* local port for sshd forwarding */
     char *wraplog;             /* wrapper log file (NULL disables) */
-    char *bootimg;             /* boot image file to use */
     char **socknames;          /* local socket file names to use */
 };
 
-void qemucli_gen(struct qemucli_args *qa, struct strvec *qvec);
+void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
+                 struct strvec *qvec);
 
 #endif /* MVP_QEMUCLI_H */

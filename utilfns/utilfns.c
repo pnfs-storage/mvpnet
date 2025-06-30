@@ -1028,17 +1028,18 @@ int vec_search(char *target, int targterm, char **sarray) {
 }
 
 /*
- * copy a file.   dst file must not already exist.
+ * copy a file.   dst file must not already exist.  you can put
+ * additional open flags for output in flags (e.g. O_CREAT).
  * return 0 on success, -1 on failure.
  */
-int copyfile(char *src, char *dst) {
+int copyfile(char *src, char *dst, int flags) {
     int sfd = -1, dfd = -1;
     char buf[4096];
     ssize_t rrv, wrv;
 
     if ((sfd = open(src, O_RDONLY)) < 0)
         return(-1);
-    if ((dfd = open(dst, O_WRONLY|O_CREAT|O_EXCL, 0666)) < 0) {
+    if ((dfd = open(dst, O_WRONLY|flags, 0666)) < 0) {
         close(sfd);
         return(-1);
     }

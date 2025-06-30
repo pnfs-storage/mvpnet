@@ -84,7 +84,7 @@ struct strvec {
 } while (0)
 
 int cmdpathok(char *cmd);
-int copyfile(char *from, char *to);
+int copyfile(char *from, char *to, int flags);
 int dirok(char *dir);
 int fdcloexec(int fd, int state);
 pid_t fdforkprog(const char *prog, char *const argv[], int flags,
