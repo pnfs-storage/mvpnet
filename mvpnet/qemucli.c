@@ -371,7 +371,7 @@ static int qemucli_socknet_cfg(struct strvec *qvec, int rank, int nettype,
     }
 
     if (snprintf(dev, sizeof(dev),
-        "e1000,netdev=mvpnet,mac=52:55:%02x:%02x:%02x:%02x",
+        "virtio-net-pci,netdev=mvpnet,mac=52:55:%02x:%02x:%02x:%02x",
         (rank >> 24) & 0xff, (rank >> 16) & 0xff, (rank >> 8) & 0xff,
         rank & 0xff) >= sizeof(dev))
         goto done;
@@ -512,7 +512,7 @@ static int qemucli_usernet_cfg(struct strvec *qvec, int rank,
                ",hostname=", as_hostname, acmd, tcmd, tval,
                ",hostfwd=", as_hostfwd, NULL) > 0 &&
         strvec_append(qvec, "-netdev", usernet_spec, "-device",
-                      "e1000,netdev=usernet,mac=52:54:98:76:54:32",
+                      "virtio-net-pci,netdev=usernet,mac=52:54:98:76:54:32",
                       NULL) == 0) {
         rv = 0;
     }
