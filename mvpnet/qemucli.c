@@ -302,7 +302,7 @@ static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
         /*
          * if there is no argval in the current "-i" then it means
          * that the user wants to pass everything through as-is
-         * to qemu's -device flag without any mvpctl processing by us.
+         * to qemu's -drive flag without any mvpctl processing by us.
          */
         if (argval == NULL) {
             rv = (pulls.nused == 0) ? 0 : -1;  /* ensure no mvpctl */
@@ -312,7 +312,7 @@ static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
                 mlog(MVP_ERR, "mvpctl on qemu passthru: %s", imgs->base[lcv]);
                 return(-1);
             }
-            if (strvec_append(qvec, "-device", imgs->base[lcv], NULL) != 0) {
+            if (strvec_append(qvec, "-drive", imgs->base[lcv], NULL) != 0) {
                 mlog(MVP_CRIT, "malloc/append to qvec failed!");
                 return(-1);
             }
