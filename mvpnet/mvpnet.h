@@ -46,6 +46,7 @@
  */
 struct mvpopts {
     int bufsz_ml;          /* mlog message buffer size (bytes) */
+    char *cloudinit;       /* cloud-init info (image file or dir) */
     int conlog;            /* enable console log file? */
     char *defpri_ml;       /* default mlog priority */
     struct strvec domain;  /* domain(s) for resolver */

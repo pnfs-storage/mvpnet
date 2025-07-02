@@ -47,6 +47,7 @@
 #include <unistd.h>
 
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #include "mvp_mlog.h"
 #include "qemucli.h"
@@ -154,6 +155,35 @@ static int qemucli_procarg(char *arg, char **argval, char **pullouts,
         strvec_free(pulls);
     }
     return((goterr) ? -1 : 0);
+}
+
+/*
+ * insert cloudinit info into the storage qvec when cloudinit has
+ * been enabled.   return 0 on success, -1 on error.
+ */
+int qemucli_storage_cloudinit(struct strvec *qvec, char *cloudinit) {
+    struct stat st;
+    char *spec;
+    int rv;
+
+    if (stat(cloudinit, &st) < 0 ||
+        (!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode))) {
+        mlog(MVP_ERR, "qemucli: cloudinit %s failed", cloudinit);
+        return(-1);
+    }
+
+    if (strgen(&spec, "file=",
+               (S_ISDIR(st.st_mode)) ? "fat:" : "", cloudinit,
+               (S_ISDIR(st.st_mode)) ? ",file.label=cidata" : "",
+               ",snapshot=on,media=disk,if=virtio", NULL) < 1) {
+        mlog(MVP_CRIT, "strgen: cloudinit");
+        return(-1);
+    }
+
+    rv = strvec_append(qvec, "-drive", spec, NULL);
+    free(spec);    /* always need to free this */
+
+    return((rv != 0) ? -1 : 0);
 }
 
 /*
@@ -285,7 +315,8 @@ done:
  */
 static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
                                char *ranktag, struct strvec *imgs,
-                               char *rundir, struct strvec *tmps) {
+                               char *rundir, char *cloudinit,
+                               struct strvec *tmps) {
     static char *pullout[] = { "mvpctl", NULL };
     static char *defaults[] = { "media=disk", "if=virtio", NULL };
     int lcv, rv;
@@ -294,6 +325,7 @@ static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
 
     /* process each -i in order given */
     for (lcv = 0 ; imgs->base[lcv] != NULL ; lcv++) {
+
         rv = qemucli_procarg(imgs->base[lcv], &argval, pullout,
                              defaults, &mains, &pulls);
         if (rv == -1)
@@ -316,30 +348,38 @@ static int qemucli_storage_cfg(struct strvec *qvec, char *jobtag,
                 mlog(MVP_CRIT, "malloc/append to qvec failed!");
                 return(-1);
             }
-            continue;
-        }
 
-        /*
-         * argval is an image filename that we will apply mvpctl to
-         * before adding the info to qvec.  determine mvpctl to use.
-         */
-        if (pulls.nused == 0) {   /* no mvpctl provided by user? */
-            mvpctl = (rundir == NULL) ? "" : "cjrd";
         } else {
-            mvpctl = pulls.base[0];   /* need to skip over 'mvpopts=' */
-            while (*mvpctl && *mvpctl != '=')
-                mvpctl++;
-            if (*mvpctl == '=')       /* skip the '=' too */
-                mvpctl++;
+
+            /*
+             * argval is an image filename that we will apply mvpctl to
+             * before adding the info to qvec.  determine mvpctl to use.
+             */
+            if (pulls.nused == 0) {   /* no mvpctl provided by user? */
+                mvpctl = (rundir == NULL) ? "" : "cjrd";
+            } else {
+                mvpctl = pulls.base[0];   /* need to skip over 'mvpopts=' */
+                while (*mvpctl && *mvpctl != '=')
+                    mvpctl++;
+                if (*mvpctl == '=')       /* skip the '=' too */
+                    mvpctl++;
+            }
+
+            rv = qemucli_storage_img(qvec, jobtag, ranktag, argval,
+                                     rundir, tmps, mvpctl, &mains);
+            free(argval);
+            strvec_free(&mains);
+            strvec_free(&pulls);
+            if (rv == -1)
+                return(rv);               /* logged elsewhere */
         }
 
-        rv = qemucli_storage_img(qvec, jobtag, ranktag, argval,
-                                 rundir, tmps, mvpctl, &mains);
-        free(argval);
-        strvec_free(&mains);
-        strvec_free(&pulls);
-        if (rv == -1)
-            return(rv);               /* logged elsewhere */
+        /* if we have cloudinit data, insert it after the first entry */
+        if (lcv == 0 && cloudinit) {
+            rv = qemucli_storage_cloudinit(qvec, cloudinit);
+            if (rv == -1)
+                return(rv);      /* mloged elsewhere */
+        }
     }
 
     return(0);
@@ -557,7 +597,8 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
 
     /* storage configuration */
     if (qemucli_storage_cfg(qvec, qa->jobtag, qa->ranktag, &qa->mopt->image,
-                            qa->mopt->rundir, tmps) != 0)
+                            qa->mopt->rundir, qa->mopt->cloudinit,
+                            tmps) != 0)
         mlog_exit(1, MVP_CRIT, "qemuvec setup storage");
 
     /* usernet configuration */

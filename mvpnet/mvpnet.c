@@ -175,7 +175,8 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "flags are:\n");
     fprintf(stderr, "\t-B [sz]    *mlog msgbuf size (bytes, def=%d)\n",
             defs.bufsz_ml);
-    fprintf(stderr, "\t-c [val]   *console log on (1) or off (0) (def=%d)\n",
+    fprintf(stderr, "\t-c [val]   *cloud-init enable (cfg img file or dir)\n");
+    fprintf(stderr, "\t-C [val]   *console log on (1) or off (0) (def=%d)\n",
             defs.conlog);
     fprintf(stderr, "\t-d [dom]    domain (def=load from resolv.conf)\n");
     fprintf(stderr, "\t-D [pri]   *mlog default priority (def=%s)\n",
@@ -269,7 +270,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:d:D:ghi:j:k:l:L:m:M:n:q:r:s:S:t:u:w:X:")) != -1) {
+                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:q:r:s:S:t:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -281,6 +282,15 @@ int main(int argc, char **argv) {
             }
             break;
         case 'c':
+            match = prefix_num_match(optarg, ':', mii.rank, &optrest);
+            if (match >= 0) {
+                if (access(optrest, F_OK) < 0)
+                    rmerror(mii.rank, match, "cannot access cloud-init %s",
+                            optrest);
+                mopt.cloudinit = optrest;
+            }
+            break;
+        case 'C':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
             if (match >= 0) {
                 if (strcmp(optrest, "1") == 0 ||
@@ -565,6 +575,8 @@ int main(int argc, char **argv) {
     /* log the config */
     mlog(MVP_NOTE, "config for rank %d:", mii.rank);
     mlog(MVP_NOTE, "tags: job=%s, rank=%s", jobtag, ranktag);
+    if (mopt.cloudinit)
+        mlog(MVP_NOTE, "cloudinit: %s", mopt.cloudinit);
     if (mopt.conlog)
         mlog(MVP_NOTE, "console_log: %s", console_log);
     if (mopt.wraplog)
