@@ -98,7 +98,8 @@ Install the project...
 To build manually (without cmake) you can invoke the C compiler
 and mpicc directly from the command line as shown below.  Note
 that you have to manually run mkmloghdr.sh to generate
-mvpnet/mvp_mlog.h before you compile mvpnet.
+mvpnet/mvp_mlog.h before you compile mvpnet.  You can safely delete
+mvpnet/mvp_mlog.h after compiling.
 
 <pre>
 % ls
