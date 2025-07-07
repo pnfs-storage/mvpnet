@@ -62,7 +62,7 @@ struct tmminfo {
  * compute total/min/max across an array of records.  we handle
  * int and uint64_t for input and return the result in uint64_t.
  * base is the base of the array, recsize is the size of a record
- * (e.g. sizeof(struct mpv_stats)), rcount is the number of records
+ * (e.g. sizeof(struct mvp_stats)), rcount is the number of records
  * (e.g. the mpi world size), offset is the offset (in bytes) of
  * the value of interest, and is64 sets the type (0=int,!0=uint64_t).
  * result comes back in tmi.
@@ -367,7 +367,7 @@ void mvp_stats_proc(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
             mlog_abort(MVP_CRIT, "stats malloc on rank 0 failed");
     }
 
-    mlog(MVP_DBG, "mpv_stats_proc: MPI gathering stats at rank 0");
+    mlog(MVP_DBG, "mvp_stats_proc: MPI gathering stats at rank 0");
     ret = MPI_Gather(sts, sizeof(*sts), MPI_BYTE,
                      asts, sizeof(*asts), MPI_BYTE, 0, ma->mi.comm);
     if (ret != MPI_SUCCESS)

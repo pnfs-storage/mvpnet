@@ -186,7 +186,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-j [id]     job id/name (added to log/socket names)\n");
     fprintf(stderr, "\t-k [val]    kvm on (1) or off (0) (def=%d)\n", defs.kvm);
     fprintf(stderr, "\t-l [dir]    log file directory (def=%s)\n", defs.logdir);
-    fprintf(stderr, "\t-L [val]   *mpv mlog on (1) or off (0) (def=%d)\n",
+    fprintf(stderr, "\t-L [val]   *mvp mlog on (1) or off (0) (def=%d)\n",
             defs.logfile_ml);
     fprintf(stderr, "\t-m [mb]    *guest VM memory size in mb (def=%d)\n",
             defs.mem_mb);
