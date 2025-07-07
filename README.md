@@ -1,5 +1,27 @@
 # mvpnet
 
+The mvpnet program is a MPI application that allows users to launch
+a set of qemu-based virtual machines as a MPI job.   Users are
+free to choose the guest operating systems to run and have full root
+access to the guest.  Each mvpnet MPI rank runs its own guest VM
+under qemu.  Guest operating systems communicate with each other
+using a MPI-based virtual private network managed by mvpnet.
+
+Each mvpnet guest VM has a virtual ethernet interface configured
+using qemu's "-netdev stream" or "-netdev dgram" flags.  The qemu
+program connect this type of virtual ethernet interface to a
+unix domain socket file on the host system.   The mvpnet application
+reads ethernet frames sent by its guest OS from its ethernet interface
+socket file.  It then uses MPI point-to-point operations to forward
+the frame to the mvpnet rank running the destination guest VM.
+The destination mvpnet rank delivers the ethernet frame to its
+guest VM by writing it to the VM's socket file.
+
+The mvpnet program uses a fixed mapping between the MPI rank
+number, the guest VM IP address, and the guest VM ethernet hardware
+address in order to route ethernet frames.   Both IPv4 ARP and
+ethernet broadcast operations are supported by mvpnet.
+
 ## building mvpnet
 
 Build prerequisites:
