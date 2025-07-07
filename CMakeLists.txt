@@ -41,7 +41,7 @@ project (mvpnet C)
 
 # options
 option(MONWRAP "Build/install monwrap" ON)
-option(MVPNET "Build/install mpvnet" ON)
+option(MVPNET "Build/install mvpnet" ON)
 
 # setup cache variables for ccmake
 if (NOT CMAKE_BUILD_TYPE)
