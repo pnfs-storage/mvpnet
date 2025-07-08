@@ -111,3 +111,212 @@ CMakeLists.txt  monwrap         mvpnet          README.md       utilfns
 %
 </pre>
 
+## running mvpnet
+
+### Runtime prerequisites
+
+- a compiled version of mvpnet and monwrap (see above)
+- qemu 7.2 or later (must support "-netdev socket" or "-netdev dgram")
+  - allow qemu kvm access if possible ("-enable-kvm") to cut emulator overhead
+- a way to launch MPI jobs (mpirun w/host file, slurm salloc/srun/sbatch, etc.)
+- a bootable guest OS disk image file to run
+
+There are many ways to generate a bootable guest OS disk image to run
+with qemu (either on its own or under mvpnet).   For example, you can
+download a standard bootable Linux distribution install media file, boot
+it in a VM (e.g. as a cdrom drive), and install a fresh version of Linux
+into a virtual disk file for use with mvpnet.   Or you could download a
+cloud-aware minimal preinstalled instance of Linux and use cloud-init
+( https://cloud-init.io/ ) to configure it to work with mvpnet.
+
+### Command line options
+
+Note: mvpnet is a work in progress -- command line flags may change.
+
+Some mvpnet flag values can be prefixed with an optional MPI rank
+specification to indicate that they are only to be applied to a specific
+set of ranks.   A rank specification is a comma separated list of rank
+ranges followed by a colon.   For example:
+
+<pre>
+-C 1          # enable console log on all ranks
+              # (no rank specification)
+
+-C 0,3,7-9:1  # enable console logs only on ranks 0, 3, 7, 8, and 9
+</pre>
+Flags marked with a '*' below accept a rank specification.
+
+The main flags are:
+<pre>
+        # images to use, job id, what type of socket to use
+	-i [img]   *image spec to load
+	-c [val]   *cloud-init enable (cfg img file or dir)
+	-j [id]     job id/name (added to log/socket names)
+	-n [nett]   net type (stream or dgram) (def=stream)
+
+        # configure emulation/guest vm size
+	-k [val]    kvm on (1) or off (0) (def=1)
+	-m [mb]    *guest VM memory size in mb (def=4096)
+
+        # external programs we run (honors PATH)
+	-M [wrap]   monwrap prog name (def=monwrap)
+	-q [qemu]   qemu command (def=qemu-system-x86_64)
+
+        # directories we use
+	-r [dir]    runtime dir to copy image to (def=none)
+	-s [dir]    socket directory (def=/tmp)
+	-t [dir]    tftp dir (enables tftpd)
+	-u [usr]    username on guest (for ssh)
+	-d [dom]    domain (def=load from resolv.conf)
+</pre>
+
+Logging-related flags are:
+<pre>
+	-l [dir]    log file directory (default=/tmp)
+	-g          have rank0 dump global stats to file at exit
+
+        # what logs to enable
+	-C [val]   *console output log on (1) or off (0) (def=0)
+	-L [val]   *mpv mlog on (1) or off (0) (def=0)
+	-w [val]   *wrapper log on (1) or off (0) (def=0)
+
+        # in memory log size, logging level
+	-B [sz]    *mlog msgbuf size (bytes, def=4096)
+	-D [pri]   *mlog default priority (def=WARN)
+	-S [pri]    mlog stderr priority (def=CRIT)
+	-X [mask]  *mlog mask to set after defaults
+</pre>
+
+The "-i" image flag is the most important, as it tells mvpnet
+what image the guest VM should boot.  It can also be used
+to add additional storage devices to the guest VM (beyond
+the boot drive) by adding additional "-i" flag.
+
+There are two formats for "-i":
+
+<pre>
+ -i image-file,prop1=val1,prop2=val2,...
+
+ -i file=spec,prop1=val1,prop2=val2,...
+</pre>
+
+The first form includes an image file at the start, while
+the second consists only of property=value pairs (where one
+of the properties is 'file=').   The first form has additional
+processing by mvpnet, while the second form is passed directly
+through to qemu as-is.
+
+For the first form, support a "mvpctl=" property value to
+control how mvpnet handles the image-file.   The mvpctl
+consists of a set of flag characters:
+<pre>
+c - copy image to rundir (-r must be set)
+j - add job to filename in rundir
+r - add rank to filename in rundir
+d - remove image from rundir at exit
+J - add job to image filename (-i)
+R - add rank to image filename (-i)
+D - remove image (-i) at exit
+p - write-protect image file (read-only=on)
+s - open file in snapshot mode (snapshot=on)
+note: default mvpctl is 'cjrd' if '-r' is set
+       otherwise the default is '' if '-r' is not set
+example: '-i foo.img,mvpctl=s' run direct w/snapshot
+</pre>
+
+### Example
+
+Here's how to run a demo of mvpnet with an Ubuntu cloud-init based image
+with the current version of mvpnet.
+
+First, download a cloud-init image from https://cloud-images.ubuntu.com/ ...
+for example, a Ubuntu 24.04 image can can found here:
+
+https://cloud-images.ubuntu.com/minimal/releases/noble/release/
+
+e.g. grab [ubuntu-24.04-minimal-cloudimg-amd64.img](https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img).
+
+Second, create a cloud-init configuration directory for the
+guest VMs with the following two files in it.   The file "meta-data"
+should contain:
+<pre>
+{
+"instance-id": "iid-local01",
+"dsmode": "local"
+}
+% 
+</pre>
+
+And the file "user-data" should contain:
+<pre>
+#cloud-config
+#
+user:
+  name: user
+  ssh_authorized_keys: 
+    - ssh-rsa AAAAB3Nzazaya...
+    - ssh-rsa AAAAB3NzaC1yc...
+  sudo: 'ALL=(ALL) NOPASSWD:ALL'
+</pre>
+
+Where "user" is the login name you want to use on the host (typically
+your own account's name) and the ssh-rsa lines are appropriate ssh keys 
+from your ~/.ssh/authorized_hosts file.
+
+So if you created the cloud-init config directory in ~/tmp/cloudinit
+it should look like:
+<pre>
+% ls ~/tmp/cloudinit
+meta-data  user-data
+%
+</pre>
+
+The cloud-init image will mount this directory as a virtual FAT
+filesystem and load the config from these files.
+
+Assuming you've compiled mvpnet and put it in your path, you
+can start a 2 node mvpnet test job with something like:
+
+<pre>
+
+mkdir -p /tmp/mvp
+
+exec mpirun -n 2 \
+	./mvpnet/mvpnet -C 1 \
+	-c ~/tmp/cloudinit \
+	-i ~/tmp/ubuntu-24.04-minimal-cloudimg-amd64.img,mvpctl=s \
+	-l /tmp/mvp \
+	-M ./monwrap/monwrap -r /tmp/mvp -s /tmp/mvp  \
+        -g -L 1 -D INFO -S INFO \
+	-n dgram foo
+
+</pre>
+
+You can login to the first VM on the host system using "ssh -p 2200 localhost"
+and login to the second VM using "ssh -p 2201 localhost" on the host system.
+
+To test the MPI-based networking between the two VMs, you currently
+must manually bring up the network on each.   Open two windows on
+the host system and use the two ssh commands noted above to login
+to each VM.   The guest on port 2200 is the rank 0 guest and the
+guest on port 2201 is the rank 1 guest.
+
+On the rank 0 guest, get a root shell and bring up the ens3 interface:
+<pre>
+% ssh -p 2201 localhost
+...
+:~$ sudo -H /bin/bash
+# ip addr add 10.0.0.0/8 dev ens3
+# ip link set ens3 up
+</pre>
+
+On the rank 1 guest, repeat the above with the address 10.0.0.1/8 instead
+of 10.0.0.0.
+
+XXX: ssh keys not right for logging in between 10.0.0.0 and 10.0.0.1.
+ssh will connect over the MPI network, but you will not be able to login.
+
+To shutdown the mvpnet demo you must halt and power off both VMs.
+run "halt -p" from the root shell on both VMs.
+
+
