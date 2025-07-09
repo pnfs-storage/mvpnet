@@ -521,11 +521,11 @@ static int get_domains(struct strvec *domains, char **dstringp) {
  * append usernet config to qemu command line vector.
  * return 0 on success, -1 on failure.
  */
-static int qemucli_usernet_cfg(struct strvec *qvec, int rank,
+static int qemucli_usernet_cfg(struct strvec *qvec, int rank, int wsize,
                                struct strvec *domains, char *tftpdir,
                                int localport) {
     int rv = -1;
-    char as_hostname[32], as_hostfwd[64];
+    char as_hostname[32], as_hostfwd[64], dev[64];
     char *as_domains = NULL;     /* malloced */
     char *acmd, *tcmd, *tval;
     char *usernet_spec = NULL;
@@ -546,14 +546,18 @@ static int qemucli_usernet_cfg(struct strvec *qvec, int rank,
         tcmd = ",tftp=";
         tval = tftpdir;
     }
+    if (snprintf(dev, sizeof(dev),
+        "virtio-net-pci,netdev=usernet,mac=52:56:%02x:%02x:%02x:%02x",
+        (wsize >> 24) & 0xff, (wsize >> 16) & 0xff, (wsize >> 8) & 0xff,
+        wsize & 0xff) >= sizeof(dev))
+        goto done;
 
     /* generate string and append cfg */
     if (strgen(&usernet_spec, "user,id=usernet,net=192.168.1.0/24",
                ",hostname=", as_hostname, acmd, tcmd, tval,
                ",hostfwd=", as_hostfwd, NULL) > 0 &&
         strvec_append(qvec, "-netdev", usernet_spec, "-device",
-                      "virtio-net-pci,netdev=usernet,mac=52:54:98:76:54:32",
-                      NULL) == 0) {
+                      dev, NULL) == 0) {
         rv = 0;
     }
 
@@ -602,7 +606,7 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
         mlog_exit(1, MVP_CRIT, "qemuvec setup storage");
 
     /* usernet configuration */
-    if (qemucli_usernet_cfg(qvec, qa->mi.rank, &qa->mopt->domain,
+    if (qemucli_usernet_cfg(qvec, qa->mi.rank, qa->mi.wsize, &qa->mopt->domain,
                             qa->mopt->tftpdir, qa->localport) != 0)
         mlog_exit(1, MVP_CRIT, "qemuvec setup usernet");
 
