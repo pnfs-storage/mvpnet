@@ -297,8 +297,8 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
              a->mi.rank, arp_qrank, fbuf);
 
         /* first allocate space for the reply in fbm_bcast */
-        if (fbufmgr_newframe(&a->mq->fbm_bcast, nbytes,
-                             &rep_fstart, &rep_fbuf) != 0) {
+        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, nbytes,
+                                  &rep_fstart, &rep_fbuf) != 0) {
             mlog(FDIO_CRIT, "pqframe: bcast-ARP: no space for reply %d - drop",
                  arp_qrank);
             return;
@@ -310,8 +310,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             memcpy(rep_fstart, fstart, xtrahdrsz);
         pkgfmt_arp_mkreply(efrm, arp_qrank, rep_frm);
 
-        /* establish fbuf loan and add to recvq */
-        fbuf_loan(rep_fbuf);
+        /* add to recvq */
         /* XXXCDC: do we need notify flag on below call? */
         rqe = mvp_rq_queue_fbuf(a->mq, rep_fstart, nbytes, rep_fbuf, 1);
         if (rqe == NULL) {
@@ -345,12 +344,11 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             void *copy;
             struct fbuf *copy_fbuf;
 
-            if (fbufmgr_newframe(&a->mq->fbm_bcast, nbytes, &copy,
-                                 &copy_fbuf) != 0) {
+            if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, nbytes, &copy,
+                                      &copy_fbuf) != 0) {
                 mlog(FDIO_CRIT, "pqframe: bcast no fbuf space for c[1]! drop");
             } else {
                 memcpy(copy, fstart, nbytes);   /* copy! */
-                fbuf_loan(copy_fbuf);           /* establish loan */
                 sqe = mvp_sq_queue(a->mq, children[1], copy, nbytes,
                                    copy_fbuf);
                 if (sqe == NULL) {
@@ -701,8 +699,8 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
 
         mlog(FDIO_DBG, "loadnext: bcast cpy%d rqe=%p to %d", lcv,
              curq->rqe, children[lcv]);
-        if (fbufmgr_newframe(&a->mq->fbm_bcast, curq->rqe->flen, &copy,
-                             &copy_fbuf) != 0) {
+        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, &copy,
+                                  &copy_fbuf) != 0) {
             mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
                  src_rank);
             break;
@@ -711,7 +709,6 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
         memcpy(copy, curq->rqe->frame, curq->rqe->flen);
         mlog(FDIO_DBG, "loadnext: bcast to %d loan on fb=%p", children[lcv],
              copy_fbuf);
-        fbuf_loan(copy_fbuf);           /* establish loan to fbm_bcast */
 
         sqe = mvp_sq_queue(a->mq, children[lcv], copy, curq->rqe->flen,
                            copy_fbuf);

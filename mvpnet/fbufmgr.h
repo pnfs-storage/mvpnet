@@ -101,8 +101,8 @@ typedef size_t fbuf_cb_t(struct fbuf *fbuf, char *fstart,
 
 int fbufmgr_init(struct fbufmgr *mgr, char *id, size_t fbsize,
                  size_t minavail);
-int fbufmgr_newframe(struct fbufmgr *mgr, size_t size, void **framep,
-                     struct fbuf **fbufp);
+int fbufmgr_loan_newframe(struct fbufmgr *mgr, size_t size, void **framep,
+                          struct fbuf **fbufp);
 ssize_t fbufmgr_recv(struct fbufmgr *mgr, int sock, fbuf_cb_t fcb, void *arg);
 void fbufmgr_stats(struct fbufmgr *mgr, struct fbuf_stats *fbs);
 void fbufmgr_finalize(struct fbufmgr *mgr);

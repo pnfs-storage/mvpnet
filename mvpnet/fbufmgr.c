@@ -85,13 +85,13 @@
  * data on a SOCK_STREAM socket where message boundaries are not
  * preserved).
  *
- * the fbufmgr also support the fbufmgr_newframe() API.  this
+ * the fbufmgr also support the fbufmgr_loan_newframe() API.  this
  * interface provides a non-socket non-callback based mechanism
  * for reserving space for a complete frame in a fbuf.  note
- * that fbufmgr_newframe() will fail if called on a fbuf that
+ * that fbufmgr_loan_newframe() will fail if called on a fbuf that
  * contains an incomplete frame.  to be safe, do not mix calls
- * to fbufmgr_recv() and fbufmgr_newframe() on the same fbufmgr.
- * (instead, use two fbufmgrs: one for recv and one for newframe.)
+ * to fbufmgr_recv() and fbufmgr_loan_newframe() on the same fbufmgr.
+ * (instead, use two fbufmgrs: one for recv and one for loan_newframe.)
  */
 
 /*
@@ -216,38 +216,39 @@ done:
 }
 
 /*
- * get space for a new frame in a fbufmgr.  caller is responsible
- * for copying the frame data in and loaning it out to other
- * subsystems.   the active fbuf in fbufmgr must not be holding
+ * get space for a new frame in a fbufmgr.  we establish a loan
+ * for the new frame.   the caller is responsible for copying the
+ * frame data in.   the active fbuf in fbufmgr must not be holding
  * a partial frame (or we'll fail).   return 0 on success,
  * return a unix errno code on failure.
  */
-int fbufmgr_newframe(struct fbufmgr *mgr, size_t size, void **framep,
-                     struct fbuf **fbufp) {
+int fbufmgr_loan_newframe(struct fbufmgr *mgr, size_t size, void **framep,
+                         struct fbuf **fbufp) {
     struct fbuf *active = mgr->active;
 
     /* validate size - none of these should happen with normal usage */
     if (size > mgr->min_avail) {             /* size larger than max? */
-        mlog(FBUF_ERR, "newframe: id=%s EINVAL size=%zd, minava=%zd",
+        mlog(FBUF_ERR, "loan_newframe: id=%s EINVAL size=%zd, minava=%zd",
              mgr->id, size, mgr->min_avail);
         return(EINVAL);
     }
     if (size > (active->end - active->rp)) { /* no space for size? */
-        mlog(FBUF_ERR, "newframe: id=%s ENOSPC size=%zd, got=%zd",
+        mlog(FBUF_ERR, "loan_newframe: id=%s ENOSPC size=%zd, got=%zd",
              mgr->id, size, active->end - active->rp);
         return(ENOSPC);
     }
     if (active->fstart != active->rp)      { /* incomplete frame? */
-        mlog(FBUF_ERR, "newframe: id=%s newframe EBUSY", mgr->id);
+        mlog(FBUF_ERR, "loan_newframe: id=%s loan_newframe EBUSY", mgr->id);
         return(EBUSY);
     }
 
+    fbuf_loan(active);                       /* caller must return loan */
     *framep = active->fstart;
     *fbufp = active;
 
     active->rp += size;
     active->fstart = active->rp;
-    mlog(FBUF_DBG, "newframe: id=%s OK active=%p, size=%zd, resid=%zd",
+    mlog(FBUF_DBG, "loan_newframe: id=%s OK active=%p, size=%zd, resid=%zd",
          mgr->id, active, size, active->end - active->rp);
 
     if (active->end - active->rp < mgr->min_avail) {  /* below threshold? */
