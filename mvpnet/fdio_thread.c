@@ -310,9 +310,13 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             memcpy(rep_fstart, fstart, xtrahdrsz);
         pkgfmt_arp_mkreply(efrm, arp_qrank, rep_frm);
 
-        /* add to recvq */
-        /* XXXCDC: do we need notify flag on below call? */
-        rqe = mvp_rq_queue_fbuf(a->mq, rep_fstart, nbytes, rep_fbuf, 1);
+        /*
+         * add to recvq.  we do not need to notify ourselves since
+         * the fdio thread progresses the rq after handling poll()
+         * I/O (i.e. what we are doing now) so we'll catch it there
+         * before the next call to poll().
+         */
+        rqe = mvp_rq_queue_fbuf(a->mq, rep_fstart, nbytes, rep_fbuf, 0);
         if (rqe == NULL) {
             mlog(FDIO_CRIT, "pqframe: rqe/c2 alloc fail %d, drop", arp_qrank);
             fbuf_return(rep_fbuf);  /* failed, drop the loan */
