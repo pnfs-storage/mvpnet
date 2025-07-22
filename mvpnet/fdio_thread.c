@@ -343,39 +343,20 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
         mlog(FDIO_DBG, "pqframe: bcast start from %d - routing", a->mi.rank);
         fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank, children);
 
-        /* if we have 2 children, we make a copy for the second child */
-        if (children[1] != -1) {
-            void *copy;
-            struct fbuf *copy_fbuf;
-
-            if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, nbytes, &copy,
-                                      &copy_fbuf) != 0) {
-                mlog(FDIO_CRIT, "pqframe: bcast no fbuf space for c[1]! drop");
-            } else {
-                memcpy(copy, fstart, nbytes);   /* copy! */
-                sqe = mvp_sq_queue(a->mq, children[1], copy, nbytes,
-                                   copy_fbuf);
-                if (sqe == NULL) {
-                    mlog(FDIO_CRIT, "pqframe: bcast drop: no sqe1 space");
-                    fbuf_return(copy_fbuf);  /* failed, drop the loan */
-                } else {
-                    mlog(FDIO_DBG, "pqframe: bcast c1 sqe=%p, fb=%p",
-                         sqe, copy_fbuf);
-                }
-            }
-        }
-
-        /* the first child gets the main buffer */
-        if (children[0] != -1) {
+        for (int lcv = 0 ; lcv < 2; lcv++) {
+            if (children[lcv] == -1)
+                continue;
             fbuf_loan(fbuf);                    /* establish loan */
-            sqe = mvp_sq_queue(a->mq, children[0], fstart, nbytes, fbuf);
+            sqe = mvp_sq_queue(a->mq, children[lcv], fstart, nbytes, fbuf);
             if (sqe == NULL) {
-                mlog(FDIO_CRIT, "pqframe: bcast drop: no sqe0 space");
+                mlog(FDIO_CRIT, "pqframe: bcast drop: no sqe%d space", lcv);
                 fbuf_return(fbuf);  /* failed, drop the loan */
             } else {
-                mlog(FDIO_DBG, "pqframe: bcast c0 sqe=%p, fb=%p", sqe, fbuf);
+                mlog(FDIO_DBG, "pqframe: bcast c%d sqe=%p, fb=%p",
+                     lcv, sqe, fbuf);
             }
         }
+
         return;
     }
 
