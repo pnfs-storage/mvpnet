@@ -640,6 +640,14 @@ int main(int argc, char **argv) {
     fdioargs.mq = &mvpq;
     /* XXXCDC: anything else we need to pass to it?  app script? */
 
+    /*
+     * barrier here to ensure that any copyfile() calls in qemucli_gen()
+     * have completed on all ranks before we let fdio thread start qemu.
+     * (allows for the case where one rank wants to run using an image
+     * created/copied by another rank...)
+     */
+    MPI_Barrier(mii.comm);
+
     /* now we can launch the fdio thread... */
     ret = pthread_create(&fdio_thread.pth, NULL, fdio_main, &fdioargs);
     if (ret != 0)
