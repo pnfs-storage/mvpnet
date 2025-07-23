@@ -171,7 +171,7 @@ static int mpimts_add(struct mpimtsmgr *mts, struct sendq_entry *sqe,
  * mvq_queuing for reuse.
  */
 static void mpimts_done(struct mvp_queuing *mq, struct sendq_entry *sqe) {
-    if (sqe->owner)
+    if (sqe->owner)      /* currently should always be set */
         fbuf_return(sqe->owner);
     mvp_sq_release(mq, sqe);
 }
