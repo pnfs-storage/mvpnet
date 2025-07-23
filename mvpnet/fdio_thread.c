@@ -637,7 +637,7 @@ static void fdio_read_dgqout(struct fdio_args *a, struct pollfd *pf,
 static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     int xtrahdrsz = (a->nettype == SOCK_STREAM) ? 4 : 0;
     uint8_t *efrm;
-    int src_rank, children[2], lcv;
+    int src_rank, children[2], nchildren, lcv;
     void *copy;
     struct fbuf *copy_fbuf;
     struct sendq_entry *sqe;
@@ -674,24 +674,31 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     /* compute children in bcast tree */
     mlog(FDIO_DBG, "loadnext: bcast from rank %d - routing!", src_rank);
     fdio_binary_router(src_rank, a->mi.wsize, a->mi.rank, children);
+    nchildren = ((children[0] != -1) ? 1 : 0) +
+                ((children[1] != -1) ? 1 : 0);
 
     /* send copies to any children we have */
     a->fst.bcastin_cnt++;
     a->fst.bcastin_bytes += curq->rqe->flen;
+    if (nchildren == 0)
+        return;                          /* done, no children to forward to */
+
+    /* copy frame to fbm_bcast for forwarding */
+    if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, &copy,
+                              &copy_fbuf) != 0) {
+        mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
+             src_rank);
+        return;
+    }
+    memcpy(copy, curq->rqe->frame, curq->rqe->flen);
+    if (nchildren > 1) {
+        fbuf_loan(copy_fbuf);  /* additional loan for second child */
+    }
+
     for (lcv = 0 ; lcv < 2 ; lcv++) {
-        if (children[lcv] == -1)         /* no more children? */
-            break;
+        if (children[lcv] == -1)
+            continue;
 
-        mlog(FDIO_DBG, "loadnext: bcast cpy%d rqe=%p to %d", lcv,
-             curq->rqe, children[lcv]);
-        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, &copy,
-                                  &copy_fbuf) != 0) {
-            mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
-                 src_rank);
-            break;
-        }
-
-        memcpy(copy, curq->rqe->frame, curq->rqe->flen);
         mlog(FDIO_DBG, "loadnext: bcast to %d loan on fb=%p", children[lcv],
              copy_fbuf);
 
@@ -701,7 +708,6 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
             mlog(FDIO_CRIT, "loadnext: bcast sqe alloc fail for %d, drop",
                  children[lcv]);
             fbuf_return(copy_fbuf);  /* failed, drop the loan */
-            break;
         } else {
             mlog(FDIO_DBG, "loadnext: q bcastcopy sqe=%p, dst=%d",
                  sqe, children[lcv]);
