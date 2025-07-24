@@ -587,7 +587,8 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
     /* qemu command and flags to set a serial console */
     if (strvec_append(qvec, qa->mopt->qemucmd, "-serial", "mon:stdio",
                        "-nographic", "-display", "none",
-                       "-vga", "none", NULL) != 0)
+                       "-vga", "none", "-cpu", qa->mopt->processor,
+                       NULL) != 0)
         mlog_exit(1, MVP_CRIT, "qemuvec setup serial");
 
     /* kvm option */

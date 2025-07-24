@@ -59,6 +59,7 @@ struct mvpopts {
     int mem_mb;            /* #mb of memory for guest VM */
     char *monwrap;         /* monwrap program */
     int nettype;           /* type of local socket to use for qemu network */
+    char *processor;       /* processor type to use w/qemu */
     char *qemucmd;         /* qemu command */
     char *rundir;          /* runtime directory to copy image to */
     char *sockdir;         /* directory to put sockets in */
@@ -75,8 +76,8 @@ struct mvpopts {
         .bufsz_ml = 4096, .defpri_ml = "WARN", .domain = STRVEC_INIT,          \
         .image = STRVEC_INIT, .kvm = 1, .logdir = "/tmp", .mem_mb = 4096,      \
         .monwrap = "monwrap", .nettype = SOCK_STREAM,                          \
-        .qemucmd = "qemu-system-x86_64", .sockdir = "/tmp",                    \
-        .stderrpri_ml = "CRIT"                                                 \
+        .processor = "host", .qemucmd = "qemu-system-x86_64",                  \
+        .sockdir = "/tmp", .stderrpri_ml = "CRIT"                              \
     }
 
 /* struct to track if a pthread is running */

@@ -193,6 +193,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-M [wrap]   monwrap prog name (def=%s)\n", defs.monwrap);
     fprintf(stderr, "\t-n [nett]   net type (stream or dgram) (def=%s)\n",
             (defs.nettype == SOCK_STREAM) ? "stream" : "dgram");
+    fprintf(stderr, "\t-p [proc]  *qemu cpu type (def=%s)\n", defs.processor);
     fprintf(stderr, "\t-q [qemu]   qemu command (def=%s)\n", defs.qemucmd);
     fprintf(stderr, "\t-r [dir]    run dir to copy image to (def=none)\n");
     fprintf(stderr, "\t-s [dir]    socket directory (def=%s)\n", defs.sockdir);
@@ -270,7 +271,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:q:r:s:S:t:u:w:X:")) != -1) {
+                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -385,6 +386,15 @@ int main(int argc, char **argv) {
             } else {
                 rmerror(mii.rank, 0, "bad nettype: %s (stream or dgram)",
                         optarg);
+            }
+            break;
+       case 'p':
+            match = prefix_num_match(optarg, ':', mii.rank, &optrest);
+            if (match >= 0) {
+                mopt.processor = optrest;
+                if (strlen(mopt.processor) < 1)
+                    rmerror(mii.rank, match, "processor: bad -p val=%s",
+                            optrest);
             }
             break;
         case 'q':
