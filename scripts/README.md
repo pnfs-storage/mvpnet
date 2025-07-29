@@ -14,12 +14,12 @@ initial VM instantiation, for example in "cloud-init-per once":
 bootcmd:
   - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
 ```
-It is more convenient to perform tasks this way than to enumerate them 
-individually in the `cloud-init` configuration. This script could also be used 
-to manually prepare a disk image without `cloud-init`.
+    It is more convenient to perform tasks this way than to enumerate them 
+    individually in the `cloud-init` configuration. This script could also be used 
+    to manually prepare a disk image without `cloud-init`.
 
-While this script is usable as-is, it is also meant to serve as an example of
-how images can be prepared for use in the mvpnet environment.
+    While this script is usable as-is, it is also meant to serve as an example of
+    how images can be prepared for use in the mvpnet environment.
 
 * `prep-config.sh`: prepares data for use in the `cloud-init` configuration
 environment.  This script is also meant to serve as an example of what can be 
