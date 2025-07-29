@@ -9,12 +9,11 @@ world.  The shell version is provided since some distribution's cloud images no
 longer include perl.
 
 * `imageprep.sh`: a one-time sequence of tasks to perform before or during 
-initial VM instantiation, for example in "cloud-init-per once":
-```
-bootcmd:
-  - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
-```
-
+initial VM instantiation, for example in "`cloud-init-per once`":
+    ```
+    bootcmd:
+      - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
+    ```
     It is more convenient to perform tasks this way than to enumerate them 
     individually in the `cloud-init` configuration. This script could also be used 
     to manually prepare a disk image without `cloud-init`.
