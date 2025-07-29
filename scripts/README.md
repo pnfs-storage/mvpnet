@@ -14,6 +14,7 @@ initial VM instantiation, for example in "cloud-init-per once":
 bootcmd:
   - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
 ```
+
     It is more convenient to perform tasks this way than to enumerate them 
     individually in the `cloud-init` configuration. This script could also be used 
     to manually prepare a disk image without `cloud-init`.
