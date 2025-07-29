@@ -57,6 +57,10 @@ else
   echo "mvpiface=${mvpiface}"
 fi
 
+if [ $((${rank})) -gt $((${wsize})) ]; then
+  die "rank cannot be larger than world size"
+fi
+
 # update hosts files based on world size
 cp /etc/hosts /tmp/mvphosts || die "couldn't write temporary hosts file"
 (grep -vE "^#wsize: |^10\." /tmp/mvphosts; echo "#wsize: ${wsize}";
