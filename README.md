@@ -34,15 +34,15 @@ The mvpnet and wrapper programs are usually built using
 [cmake](https://cmake.org/) (but they also can be built manually).
 To build using cmake, unpack the mvpnet source tree, make a build
 directory, ensure that MPI is either in your path or it's location
-is specified in either CMAKE_INSTALL_PREFIX or CMAKE_PREFIX_PATH,
-and then run cmake followed by make.
+is specified in either `CMAKE_INSTALL_PREFIX` or `CMAKE_PREFIX_PATH`,
+and then run `cmake` followed by `make`.
 
-Note that CMAKE_INSTALL_PREFIX is used to tell cmake where to install
-mvpnet.   CMAKE_PREFIX_PATH is used to specify additional directories
-beyond PATH and CMAKE_INSTALL_PREFIX to search for external packages
+Note that `CMAKE_INSTALL_PREFIX` is used to tell cmake where to install
+mvpnet.   `CMAKE_PREFIX_PATH` is used to specify additional directories
+beyond PATH and `CMAKE_INSTALL_PREFIX` to search for external packages
 (like MPI).
 
-Example builds that installs in /tmp/mvp and uses MPI from /usr/mpich:
+Example build that installs in `/tmp/mvp` and uses MPI from `/usr/mpich`:
 <pre>
 % cd /usr/local/src/mvpnet
 % ls
@@ -96,10 +96,10 @@ Install the project...
 </pre>
 
 To build manually (without cmake) you can invoke the C compiler
-and mpicc directly from the command line as shown below.  Note
-that you have to manually run mkmloghdr.sh to generate
-mvpnet/mvp_mlog.h before you compile mvpnet.  You can safely delete
-mvpnet/mvp_mlog.h after compiling.
+and `mpicc` directly from the command line as shown below.  Note
+that you have to manually run `mkmloghdr.sh` to generate
+`mvpnet/mvp_mlog.h` before you compile mvpnet.  You can safely delete
+`mvpnet/mvp_mlog.h` after compiling.
 
 <pre>
 % ls
@@ -261,7 +261,7 @@ user:
 
 Where "user" is the login name you want to use on the host (typically
 your own account's name) and the ssh-rsa lines are appropriate ssh keys 
-from your ~/.ssh/authorized_hosts file.
+from your `~/.ssh/authorized_hosts` file.
 
 So if you created the cloud-init config directory in ~/tmp/cloudinit
 it should look like:
