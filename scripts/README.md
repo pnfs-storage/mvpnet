@@ -1,6 +1,6 @@
 # Supplemental `mvpnet` scripts
 
-This directory contains scripts that are useful with `mvpnet`.
+This directory contains scripts that are useful with `mvpnet`:
 
 * `mvpnet.sh` and `mvpnet.pl`: the mvp network interface is special and is not
 configured normally by the qemu dhcp server.  These scripts configure that 
@@ -8,7 +8,7 @@ interface and some other things based on the configuration of the mvpnet MPI
 world.  The shell version is provided since some distribution's cloud images no 
 longer include perl.
 
-* `imageprep.sh`: a one-time sequence of task's to perform before or during 
+* `imageprep.sh`: a one-time sequence of tasks to perform before or during 
 initial VM instantiation, for example in "cloud-init-per once":
 ```
 bootcmd:
@@ -22,6 +22,6 @@ While this script is usable as-is, it is also meant to serve as an example of
 how images can be prepared for use in the mvpnet environment.
 
 * `prep-config.sh`: prepares data for use in the `cloud-init` configuration
-environment.  This script is also meant to be exemplary in what can be performed
-with this configuration method.
+environment.  This script is also meant to serve as an example of what can be 
+performed with this configuration method.
 
