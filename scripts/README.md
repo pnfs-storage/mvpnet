@@ -9,7 +9,7 @@ world.  The shell version is provided since some distribution's cloud images no
 longer include perl.
 
 * `imageprep.sh`: a one-time sequence of tasks to perform before or during 
-initial VM instantiation, for example in "`cloud-init-per once`":
+initial VM instantiation, for example in `cloud-init-per once`:
     ```
     bootcmd:
       - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
