@@ -248,20 +248,8 @@ Demonstrations of both of these methods are included below.
 
 Here is an example of how to use the `cloud-init` configuration system with mvpnet.
 
-First, download a cloud-init image.  Here we use a CentOS Stream 9 image:
-```
-$ cd /l0/images/
-$ curl -OL https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100 1447M  100 1447M    0     0  21.3M      0  0:01:07  0:01:07 --:--:-- 24.1M
-$ curl -OL https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2.SHA256SUM
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100   216  100   216    0     0    481      0 --:--:-- --:--:-- --:--:--   481
-$ sha256sum -c CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2.SHA256SUM
-CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2: OK
-```
+First, download a cloud-init image.  Here we use a CentOS Stream 9 image from:
+https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2
 
 Some preinstalled cloud disk images are constructed to be as small as possible,
 leaving little room for the installation of additional software after the VM is
