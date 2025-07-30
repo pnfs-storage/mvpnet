@@ -10,22 +10,26 @@ die () {
   exit 1
 }
 
+warn () {
+  echo "INFO: $*" 1>&2
+}
+
 usage () {
-	if [ -n "$*" ]; then
-		echo "error: $*"
-	fi
-	echo "prep-config - prepare a directory to supply cloud-init configuration in"
+  if [ -n "$*" ]; then
+    echo "error: $*"
+  fi
+  echo "prep-config - prepare a directory to supply cloud-init configuration in"
   echo "              the mvpnet environment"
   echo
-	echo "usage: prep-config seed-dir [packagelist]"
-	echo
-	echo "  seed-dir is the name of the target directory to write"
-	echo "  configuration information"
-	echo
-	echo "  packagelist is an optional text file containing a list of"
-	echo "  package names, one per line, to install after startup"
-	echo
-	exit 1
+  echo "usage: prep-config seed-dir [packagelist]"
+  echo
+  echo "  seed-dir is the name of the target directory to write"
+  echo "  configuration information"
+  echo
+  echo "  packagelist is an optional text file containing a list of"
+  echo "  package names, one per line, to install after startup"
+  echo
+  exit 1
 }
 
 ## parse args
@@ -33,17 +37,22 @@ usage () {
 seed_dir="${1}"
 if [ $# -eq 2 ]; then
   if [ -s ${2} ]; then
-    PACKAGES="$(cat ${2}| xargs | tr ' ' ',')"
+    PACKAGES="$(cat ${2} | xargs | tr ' ' ',')"
   else
     die "couldn't read package list file"
   fi
+  else
+    warn "no packagelist file specified, not adding any packages to install"
 fi
 
 # ok if seed_dir already exists
 mkdir -p ${seed_dir} || die "failed to make seed directory"
 
 # create a passwordless ssh keypair for the VMs if it doesn't already exist
-if [ ! -s ${seed_dir}/id_ed25519 ]; then
+if [ -s ${seed_dir}/id_ed25519 ]; then
+  warn "using existing ssh key found in seed directory"
+else
+  warn "no ssh key found, generating a new one for you"
   ssh-keygen -q -f ${seed_dir}/id_ed25519 -P "" || die "couldn't generate ssh keys"
 fi
 
@@ -76,3 +85,8 @@ cat > ${seed_dir}/meta-data << EOF || die "couldn't create meta-data file"
 instance-id: iid-local01
 dsmode: local
 EOF
+
+echo
+echo "prep-config finished!"
+
+exit 0
