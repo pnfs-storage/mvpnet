@@ -18,16 +18,10 @@ usage () {
   if [ -n "$*" ]; then
     echo "error: $*"
   fi
-  echo "prep-config - prepare a directory to supply cloud-init configuration in"
-  echo "              the mvpnet environment"
+  echo "prep-config - prepare a seed directory to supply minimal cloud-init"
+  echo "              configuration in the mvpnet environment"
   echo
-  echo "usage: prep-config seed-dir [packagelist]"
-  echo
-  echo "  seed-dir is the name of the target directory to write"
-  echo "  configuration information"
-  echo
-  echo "  packagelist is an optional text file containing a list of"
-  echo "  package names, one per line, to install after startup"
+  echo "usage: prep-config seed-dir"
   echo
   exit 1
 }
@@ -35,15 +29,6 @@ usage () {
 ## parse args
 [ $# -eq 0 ] && usage "no seed directory specified"
 seed_dir="${1}"
-if [ $# -eq 2 ]; then
-  if [ -s ${2} ]; then
-    PACKAGES="packages: [$(cat ${2} | xargs | tr ' ' ',')]"
-  else
-    die "couldn't read package list file"
-  fi
-  else
-    warn "no packagelist file specified, not adding any packages to install"
-fi
 
 # ok if seed_dir already exists
 mkdir -p ${seed_dir} || die "failed to make seed directory"
@@ -74,7 +59,6 @@ user:
   ssh_authorized_keys: 
 ${SSH_AUTHORIZED_KEYS}
   sudo: 'ALL=(ALL) NOPASSWD:ALL'
-${PACKAGES}
 # this appears to be necessary when hostname is set by systemd?
 create_hostname_file: false
 EOF
@@ -86,5 +70,8 @@ EOF
 
 echo
 echo "prep-config finished!"
+echo
+echo "place any other scripts or data that you want to be available"
+echo "to the guest into ${seed_dir} before starting mvpnet."
 
 exit 0
