@@ -37,7 +37,7 @@ usage () {
 seed_dir="${1}"
 if [ $# -eq 2 ]; then
   if [ -s ${2} ]; then
-    PACKAGES="$(cat ${2} | xargs | tr ' ' ',')"
+    PACKAGES="packages: [$(cat ${2} | xargs | tr ' ' ',')]"
   else
     die "couldn't read package list file"
   fi
@@ -78,7 +78,9 @@ user:
   ssh_authorized_keys: 
 ${SSH_AUTHORIZED_KEYS}
   sudo: 'ALL=(ALL) NOPASSWD:ALL'
-packages: [${PACKAGES}]
+${PACKAGES}
+# this appears to be necessary when hostname is set by systemd?
+create_hostname_file: false
 EOF
 
 cat > ${seed_dir}/meta-data << EOF || die "couldn't create meta-data file"
