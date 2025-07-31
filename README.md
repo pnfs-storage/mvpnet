@@ -1,15 +1,16 @@
 # mvpnet
 
 The mvpnet program is an MPI application that allows users to launch
-a set of qemu-based virtual machines (VMs) as an MPI job.   Users are
-free to choose the guest operating systems to run and have full root
-access to the guest.  Each mvpnet MPI rank runs its own guest VM
-under qemu.  Guest operating systems communicate with each other
-using a MPI-based virtual private network managed by mvpnet.
+a set of [qemu-based](https://www.qemu.org/) virtual machines (VMs)
+as an MPI job.   Users are free to choose the guest operating systems
+to run and have full root access to the guest.  Each mvpnet MPI rank
+runs its own guest VM under qemu.  Guest operating systems communicate
+with each other using a MPI-based virtual private network managed
+by mvpnet.
 
 Each mvpnet guest VM has a virtual Ethernet interface configured
 using qemu's `-netdev stream` or `-netdev dgram` flags.  The qemu
-program connect this type of virtual Ethernet interface to a
+program connects this type of virtual Ethernet interface to a
 unix domain socket file on the host system.   The mvpnet application
 reads Ethernet frames sent by its guest OS from its Ethernet interface
 socket file.  It then uses MPI point-to-point operations to forward
@@ -17,10 +18,10 @@ the frame to the mvpnet rank running the destination guest VM.
 The destination mvpnet rank delivers the Ethernet frame to its
 guest VM by writing it to the VM's socket file.
 
-The mvpnet program uses a fixed mapping between the MPI rank
-number, the guest VM IP address, and the guest VM Ethernet hardware
-address in order to route Ethernet frames.   Both IPv4 ARP and
-Ethernet broadcast operations are supported by mvpnet.
+In order to route Ethernet frames, mvpnet uses a fixed mapping between
+its MPI rank number, the guest VM IP address, and the guest VM Ethernet
+hardware address.   Both IPv4 ARP and Ethernet broadcast operations are
+supported by mvpnet.
 
 ## Building mvpnet
 
@@ -109,6 +110,7 @@ CMakeLists.txt  monwrap         mvpnet          README.md       utilfns
 %
 % mpicc -O -Iutilfns -o /tmp/mvp/bin/mvpnet utilfns/*.c mvpnet/*.c
 %
+% rm mvpnet/mvp_mlog.h
 </pre>
 
 ## Running mvpnet
@@ -193,15 +195,15 @@ There are two formats for `-i`:
  -i file=spec,prop1=val1,prop2=val2,...
 </pre>
 
-The first form includes an image file at the start, while
+The first form starts with an image filename, while
 the second consists only of `property=value` pairs (where one
-of the properties is `file=`).   The first form has additional
+of the properties allowed is `file=`).   The first form has additional
 processing by mvpnet, while the second form is passed directly
 through to qemu as-is.
 
-For the first form, support a `mvpctl=` property value to
-control how mvpnet handles the image-file.   The mvpctl property is a string
-consisting of a set of flag characters:
+The first form supports a `mvpctl=` property value to
+control how mvpnet handles the image-file.   The mvpctl
+property is a string consisting of a set of flag characters:
 <pre>
 c - copy image to rundir (-r must be set)
 j - add job to filename in rundir
