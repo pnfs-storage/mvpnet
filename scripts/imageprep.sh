@@ -6,8 +6,8 @@
 #
 
 # proxy config
-echo 'export https_proxy="http://proxy.pdl.cmu.edu:3128/"' >> /etc/environment
-echo 'export http_proxy="http://proxy.pdl.cmu.edu:3128/"' >> /etc/environment
+# create this script if you need to use a proxy in your network environment
+/mnt/proxy-config.sh
 
 # install ssh keys for MPI usage
 #  for root

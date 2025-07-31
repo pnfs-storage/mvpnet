@@ -69,10 +69,6 @@ bootcmd:
   - mount -oro /dev/disk/by-label/cidata /mnt
   - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
   - [ cloud-init-per, always, mvpnet-init, sh, -c, '/mnt/mvpnet-init' ]
-apt:
-  proxy: http://proxy.pdl.cmu.edu:3128/
-  http_proxy: http://proxy.pdl.cmu.edu:3128/
-  https_proxy: http://proxy.pdl.cmu.edu:3128/
 user:
   name: ${USER}
   ssh_authorized_keys: 
