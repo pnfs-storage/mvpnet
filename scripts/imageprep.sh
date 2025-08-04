@@ -22,3 +22,6 @@ echo '    StrictHostKeyChecking no' >> /etc/ssh/ssh_config
 
 # remove /etc/hostname so that guest gets hostname from qemu dhcp:
 rm -f /etc/hostname
+
+# install packages. create this script to install packages as you want
+/mnt/install-packages.sh
