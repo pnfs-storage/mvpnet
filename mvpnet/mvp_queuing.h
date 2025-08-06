@@ -123,7 +123,7 @@ struct que_stats {
 
 /* send queue entry */
 struct sendq_entry {
-    int dest;                     /* MPI rank to send to */ 
+    int dest;                     /* MPI rank to send to */
     char *frame;                  /* frame data to send */
     int flen;                     /* length of the frame buffer */
     struct fbuf *owner;           /* fbuf that has loaned us the buffer */

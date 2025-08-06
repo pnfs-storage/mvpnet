@@ -122,7 +122,7 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
 
     mlog(MPI_INFO, "testsome (initslots/maxslots/calls): "
          "%d %d %" PRIu64, m->mts_initsz, m->mts_maxslots, m->mts_ntestsome);
-    mlog(MPI_INFO, "testsome got (1/>1/max): %" PRIu64 
+    mlog(MPI_INFO, "testsome got (1/>1/max): %" PRIu64
                    " %" PRIu64 " %" PRIu64, m->mts_got1, m->mts_gotmore,
                    m->mts_gotmax);
     mlog(MPI_INFO, "isend (cnt/bytes): %" PRIu64 " %" PRIu64, m->isend_cnt,
@@ -133,7 +133,7 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
 
     mlog(QUE_INFO, "fb-main: maxfbuf=%d",q->fbsmain.maxfbufs);
     mlog(QUE_INFO, "fb-main: retire (empty/compact/loaned): %d %d %d",
-         q->fbsmain.retire_nol_empty, q->fbsmain.retire_nol_compact, 
+         q->fbsmain.retire_nol_empty, q->fbsmain.retire_nol_compact,
          q->fbsmain.retire_loaned);
     mlog(QUE_INFO, "fb-main: sockrcv (cnt/nodata/bytes): %d %d %" PRIu64,
          q->fbsmain.sockrcv_cnt, q->fbsmain.sockrcv_nodata,
@@ -144,7 +144,7 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
 
     mlog(QUE_INFO, "fb-bcast: maxfbuf=%d",q->fbsbcast.maxfbufs);
     mlog(QUE_INFO, "fb-bcast: retire (empty/compact/loaned): %d %d %d",
-         q->fbsbcast.retire_nol_empty, q->fbsbcast.retire_nol_compact, 
+         q->fbsbcast.retire_nol_empty, q->fbsbcast.retire_nol_compact,
          q->fbsbcast.retire_loaned);
     mlog(QUE_INFO, "fb-bcast: sockrcv (cnt/nodata/bytes): %d %d %" PRIu64,
          q->fbsbcast.sockrcv_cnt, q->fbsbcast.sockrcv_nodata,
@@ -191,37 +191,37 @@ static void log_gstats(struct mpi_args *ma, struct mvp_stats *asts, int nbins,
         struct que_stats *q = &asts[r].qs;
         struct rbp_bininfo *bininfo = &abins[r*nbins];
 
-        fprintf(g, "%d.qemusend.cnt=%d\n", r, f->qemusend_cnt); 
-        fprintf(g, "%d.qemusend.bytes=%" PRIu64 "\n", r, f->qemusend_bytes); 
-        fprintf(g, "%d.qemusend.blocked=%d\n", r, f->qemusend_blocked); 
-        fprintf(g, "%d.runts=%d\n", r, f->runt_cnt); 
-        fprintf(g, "%d.unicast.cnt=%d\n", r, f->unicast_cnt); 
-        fprintf(g, "%d.unicast.bytes=%" PRIu64 "\n", r, f->unicast_bytes); 
-        fprintf(g, "%d.unicast.baddst=%d\n", r, f->unicast_baddst); 
-        fprintf(g, "%d.arpreq.cnt=%d\n", r, f->arpreq_cnt); 
-        fprintf(g, "%d.arpreq.badreq=%d\n", r, f->arpreq_badreq); 
-        fprintf(g, "%d.bcaststart.cnt=%d\n", r, f->bcast_st_cnt); 
-        fprintf(g, "%d.bcaststart.bytes=%" PRIu64 "\n", r, f->bcast_st_bytes); 
-        fprintf(g, "%d.stdin.cnt=%d\n", r, f->stdin_cnt); 
-        fprintf(g, "%d.stdin.bytes=%" PRIu64 "\n", r, f->stdin_bytes); 
-        fprintf(g, "%d.console.cnt=%d\n", r, f->console_cnt); 
-        fprintf(g, "%d.console.bytes=%" PRIu64 "\n", r, f->console_bytes); 
+        fprintf(g, "%d.qemusend.cnt=%d\n", r, f->qemusend_cnt);
+        fprintf(g, "%d.qemusend.bytes=%" PRIu64 "\n", r, f->qemusend_bytes);
+        fprintf(g, "%d.qemusend.blocked=%d\n", r, f->qemusend_blocked);
+        fprintf(g, "%d.runts=%d\n", r, f->runt_cnt);
+        fprintf(g, "%d.unicast.cnt=%d\n", r, f->unicast_cnt);
+        fprintf(g, "%d.unicast.bytes=%" PRIu64 "\n", r, f->unicast_bytes);
+        fprintf(g, "%d.unicast.baddst=%d\n", r, f->unicast_baddst);
+        fprintf(g, "%d.arpreq.cnt=%d\n", r, f->arpreq_cnt);
+        fprintf(g, "%d.arpreq.badreq=%d\n", r, f->arpreq_badreq);
+        fprintf(g, "%d.bcaststart.cnt=%d\n", r, f->bcast_st_cnt);
+        fprintf(g, "%d.bcaststart.bytes=%" PRIu64 "\n", r, f->bcast_st_bytes);
+        fprintf(g, "%d.stdin.cnt=%d\n", r, f->stdin_cnt);
+        fprintf(g, "%d.stdin.bytes=%" PRIu64 "\n", r, f->stdin_bytes);
+        fprintf(g, "%d.console.cnt=%d\n", r, f->console_cnt);
+        fprintf(g, "%d.console.bytes=%" PRIu64 "\n", r, f->console_bytes);
         fprintf(g, "%d.notequeue.cnt: %d\n", r, f->notequeue_cnt);
         fprintf(g, "%d.accept.cnt: %d\n", r, f->accept_cnt);
-        fprintf(g, "%d.bcastin.cnt=%d\n", r, f->bcastin_cnt); 
-        fprintf(g, "%d.bcastin.bytes=%" PRIu64 "\n", r, f->bcastin_bytes); 
-        fprintf(g, "%d.bcastin.badsrc=%d\n", r, f->bcastin_badsrc); 
-        fprintf(g, "%d.testsome.initslots=%d\n", r, m->mts_initsz); 
-        fprintf(g, "%d.testsome.maxslots=%d\n", r, m->mts_maxslots); 
-        fprintf(g, "%d.testsome.cnt=%" PRIu64 "\n", r, m->mts_ntestsome); 
-        fprintf(g, "%d.testsome.got1=%" PRIu64 "\n", r, m->mts_got1); 
-        fprintf(g, "%d.testsome.gotmore=%" PRIu64 "\n", r, m->mts_gotmore); 
-        fprintf(g, "%d.testsome.gotmax=%" PRIu64 "\n", r, m->mts_gotmax); 
-        fprintf(g, "%d.isend.cnt=%" PRIu64 "\n", r, m->isend_cnt); 
-        fprintf(g, "%d.isend.bytes=%" PRIu64 "\n", r, m->isend_bytes); 
-        fprintf(g, "%d.iprobe.cnt=%" PRIu64 "\n", r, m->iprobe_cnt); 
-        fprintf(g, "%d.recv.cnt=%" PRIu64 "\n", r, m->recv_cnt); 
-        fprintf(g, "%d.recv.bytes=%" PRIu64 "\n", r, m->recv_bytes); 
+        fprintf(g, "%d.bcastin.cnt=%d\n", r, f->bcastin_cnt);
+        fprintf(g, "%d.bcastin.bytes=%" PRIu64 "\n", r, f->bcastin_bytes);
+        fprintf(g, "%d.bcastin.badsrc=%d\n", r, f->bcastin_badsrc);
+        fprintf(g, "%d.testsome.initslots=%d\n", r, m->mts_initsz);
+        fprintf(g, "%d.testsome.maxslots=%d\n", r, m->mts_maxslots);
+        fprintf(g, "%d.testsome.cnt=%" PRIu64 "\n", r, m->mts_ntestsome);
+        fprintf(g, "%d.testsome.got1=%" PRIu64 "\n", r, m->mts_got1);
+        fprintf(g, "%d.testsome.gotmore=%" PRIu64 "\n", r, m->mts_gotmore);
+        fprintf(g, "%d.testsome.gotmax=%" PRIu64 "\n", r, m->mts_gotmax);
+        fprintf(g, "%d.isend.cnt=%" PRIu64 "\n", r, m->isend_cnt);
+        fprintf(g, "%d.isend.bytes=%" PRIu64 "\n", r, m->isend_bytes);
+        fprintf(g, "%d.iprobe.cnt=%" PRIu64 "\n", r, m->iprobe_cnt);
+        fprintf(g, "%d.recv.cnt=%" PRIu64 "\n", r, m->recv_cnt);
+        fprintf(g, "%d.recv.bytes=%" PRIu64 "\n", r, m->recv_bytes);
         fprintf(g, "%d.fbmain.maxfbuf=%d\n", r, q->fbsmain.maxfbufs);
         fprintf(g, "%d.fbmain.retire.empty=%d\n", r,
                 q->fbsmain.retire_nol_empty);
@@ -262,7 +262,7 @@ static void log_gstats(struct mpi_args *ma, struct mvp_stats *asts, int nbins,
             fprintf(g, "%d.recvbin.%d.cnt=%d\n", r, lcv, bininfo[lcv].cnt);
         }
     }
-    
+
     fprintf(g, "END gstats %s", ctime(&now));
     fclose(g);
 }
@@ -339,7 +339,7 @@ static void log_report(int rcount, struct mvp_stats *asts,
              tmi[0].maxrank, (int)tmi[0].maxval);
     }
     tmm(asts, statsz, rcount, roff(asts,fs.console_bytes), 1, &tmi[0]);
-    mlog(LL, "consoleout: %.1lf avg-bytes (min=r%d@%" PRIu64 
+    mlog(LL, "consoleout: %.1lf avg-bytes (min=r%d@%" PRIu64
              ", max=r%d@%" PRIu64 ")",
          tmi[0].total / (double) rcount, tmi[0].minrank, tmi[0].minval,
          tmi[0].maxrank, tmi[0].maxval);

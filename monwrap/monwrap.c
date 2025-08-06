@@ -46,7 +46,7 @@
  *
  * when but when you run with monwrap, the application setup is
  * modified to look like this:
- * 
+ *
  *                    +-------------+             +-------------+
  *  --stdin---------->|             |---inchain-->|             |
  *  <--stdout/stderr  |   monwrap   |<--monitor---| application |
@@ -108,7 +108,7 @@ struct monwrap_global {
 
 static struct monwrap_global mg = { {-1,-1}, DEF_EOFTIME, DEF_TERMTIME, 0 };
 
-/* 
+/*
  * optional log file.  once we close stdout/stderr, this is only
  * place we can print diagnostic log messages.
  */
@@ -134,12 +134,12 @@ void exit_waitstatus(pid_t waitrv, int status) {
         if (monlog)
             fprintf(monlog, "exit_waitstatus: pid %d, SIGNAL=%d\n",
                     waitrv, WTERMSIG(status));
-        exit(-1); 
+        exit(-1);
     }
     if (monlog)
         fprintf(monlog, "exit_waitstatus: pid %d, status=%d\n",
                 waitrv, status);
-    exit(-1); 
+    exit(-1);
     /*NOTREACHED*/
 }
 
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
     }
     argc -= optind;
     argv += optind;
-    
+
     if (argc == 0)
         usage(prog);
 
@@ -367,7 +367,7 @@ int main(int argc, char **argv) {
      *                 and we'll see an EOF on the read side.  this
      *                 tells us the child is done and we should finalize
      *                 it.   (we assume the child does not attempt
-     *                 to close file descriptors that it did not open.) 
+     *                 to close file descriptors that it did not open.)
      *
      * - SIGPIPE       we don't want SIGPIPE to kill us.   we can handle
      *                 getting a EPIPE error from an I/O call.
@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
     /* close child's side of inchain.  we write our stdin to inchain[1] */
     close(mg.inchain[0]);
 
-    /* 
+    /*
      * close child's side of monpipe.  we look for EOF on our side
      * of the monpipe and finalize the child if we get it.
      */

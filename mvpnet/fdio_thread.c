@@ -107,7 +107,7 @@ static void fdio_qemusend_done(struct fdio_args *a, struct qemusender *curq) {
     }
     curq->nsent = 0;
     return;
-}   
+}
 
 /*
  * routing function for a simple binary broadcast tree on top of
@@ -186,7 +186,7 @@ static void *fdio_sshprobe(void *arg) {
             close(s);
             continue;
         }
-        
+
         /* reset timer after poll and keep going */
         ms_left -= ms_time(&tbase, 0);
         ms_time(&tbase, 1);
@@ -257,7 +257,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
              a->mi.rank, dst_rank, fbuf);
 
         /* validate rank */
-        if (dst_rank != a->mi.rank && dst_rank >= 0 && 
+        if (dst_rank != a->mi.rank && dst_rank >= 0 &&
             dst_rank <= a->mi.wsize) {
             fbuf_loan(fbuf);        /* establish loan */
             sqe = mvp_sq_queue(a->mq, dst_rank, fstart, nbytes, fbuf);
@@ -322,7 +322,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             fbuf_return(rep_fbuf);  /* failed, drop the loan */
             return;
         }
-    
+
         a->fst.arpreq_cnt++;
         mlog(FDIO_DBG, "pqframe: bcast-ARP reply queued rank=%d rqe=%p fb=%p",
              arp_qrank, rqe, rep_fbuf);
@@ -536,7 +536,7 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
             if (fcntl(a->sockfds[1], F_SETFL, O_NONBLOCK) < 0)
                 mlog_exit(1, FDIO_CRIT, "readnote: dg: fcntl: %d failed: %s",
                           a->sockfds[1], strerror(errno));
-           
+
 
             /* both Q and N are now up */
             fdio_set_state(a, FDIO_RUN);
@@ -718,7 +718,7 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
 /*
  * we have data to write to PF_ST_CONN.   we are sending a frame to
  * qemu.  write what we can.  we are either going to write everything
- * (and finish the pending rqe) or get EWOULDBLOCK.  
+ * (and finish the pending rqe) or get EWOULDBLOCK.
  */
 static void fdio_write_sttoqemu(struct fdio_args *a, struct pollfd *pf,
                                 struct qemusender *curq, int *finalstate) {
@@ -757,8 +757,8 @@ static void fdio_write_sttoqemu(struct fdio_args *a, struct pollfd *pf,
 
 /*
  * we have data to write to PF_DQ_QIN.   we are sending a frame to
- * qemu.  we are either going to write everything (and finish the 
- * pending rqe) or get EWOULDBLOCK.  
+ * qemu.  we are either going to write everything (and finish the
+ * pending rqe) or get EWOULDBLOCK.
  */
 static void fdio_write_dgtoqemu(struct fdio_args *a, struct pollfd *pf,
                                 struct qemusender *curq, int *finalstate) {
@@ -966,7 +966,7 @@ void *fdio_main(void *arg) {
             if (cur_qsend.rqe == NULL) {
 
                 fdio_load_next_rqe(a, &cur_qsend); /* reload cur_qsend.rqe */
-              
+
             }
 
             if (cur_qsend.rqe) {    /* previously blocked or new rqe */
@@ -984,7 +984,7 @@ void *fdio_main(void *arg) {
                 }
             }
         }
-        
+
     }  /* end of main loop */
 
 done:   /* clean up and terminate the fdio thread */

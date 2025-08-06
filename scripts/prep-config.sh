@@ -56,7 +56,7 @@ bootcmd:
   - [ cloud-init-per, always, mvpnet-init, sh, -c, '/mnt/mvpnet-init' ]
 user:
   name: ${USER}
-  ssh_authorized_keys: 
+  ssh_authorized_keys:
 ${SSH_AUTHORIZED_KEYS}
   sudo: 'ALL=(ALL) NOPASSWD:ALL'
 # this appears to be necessary when hostname is set by systemd?

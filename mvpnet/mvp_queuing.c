@@ -99,7 +99,7 @@ static int mvp_bpool_size2bin(int size, int *bufsize) {
 static int mvp_rq_bpool_init(struct recvq_bpool *p, int minsz, int maxsz,
                              int (*sz2bin)(int sz, int *bufsize)) {
     int lcv, bs;
- 
+
     if (minsz >= maxsz) {
         mlog(QUE_ERR, "bpool_init: minsz %d >= maxsz %d", minsz, maxsz);
         return(-1);
@@ -119,7 +119,7 @@ static int mvp_rq_bpool_init(struct recvq_bpool *p, int minsz, int maxsz,
         if (p->freebins) {
             free(p->freebins);
             p->freebins = NULL;
-        } 
+        }
         if (p->bininfo) {
             free(p->bininfo);
             p->bininfo = NULL;
@@ -498,9 +498,9 @@ void mvp_queuing_finalize(struct mvp_queuing *mq) {
 
     /* close notification fds */
     if (mq->fdio_notify[0] != -1)
-        close(mq->fdio_notify[0]);    
+        close(mq->fdio_notify[0]);
     if (mq->fdio_notify[1] != -1)
-        close(mq->fdio_notify[1]);    
+        close(mq->fdio_notify[1]);
 
     /* drop/free sqes waiting for isend, then clear the free list */
     while ((sqe = TAILQ_FIRST(&mq->mpisendq)) != NULL) {

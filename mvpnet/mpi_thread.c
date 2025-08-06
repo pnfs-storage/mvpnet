@@ -222,7 +222,7 @@ static int mpimts_test(struct mpimtsmgr *mts, struct mpi_args *ma) {
         mts->sqes[i] = NULL;   /* create corrsponding hole in sqes[] */
         err = (rv == MPI_SUCCESS) ? MPI_SUCCESS : mts->statout[i].MPI_ERROR;
         if (err != MPI_SUCCESS) {
-            mlog(MPI_ERR, "mts Isend sqe %p %d->%d failed (mpierr=%d)", 
+            mlog(MPI_ERR, "mts Isend sqe %p %d->%d failed (mpierr=%d)",
                  sqe, ma->mi.rank, sqe->dest, err);
         }
         mlog(MPI_DBG, "mts sqe done: err=%d, sqe=%p, owner=%p", err,
@@ -449,7 +449,7 @@ int mpi_main(struct mpi_args *ma) {
          */
         ret = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, ma->mi.comm,
                          &pflag, &status);
-        stats.ms.iprobe_cnt++;   
+        stats.ms.iprobe_cnt++;
 
         if (ret != MPI_SUCCESS) {
             mlog(MPI_ERR, "mpi_main: MPI_Iprobe failed %d!  exit.", ret);
@@ -499,7 +499,7 @@ done:
     stats.fs = a->fst;    /* structure copy */
     mvp_queuing_stats(a->mq, &stats.qs);
     mvp_queuing_bininfo(a->mq, &nbins, &bininfo);
-    
+
     /* process the stats */
      mvp_stats_proc(ma, &stats, nbins, bininfo);
 

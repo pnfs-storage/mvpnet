@@ -779,8 +779,8 @@ int mlog_str2pri(const char *pstr) {
 
 /*
  * mlog_open: open a multilog (uses malloc, inits global state).
- * you can only have one multilog open at a time (unless you use 
- * c++ namespaces).   you * can use multiple facilities with a mlog. 
+ * you can only have one multilog open at a time (unless you use
+ * c++ namespaces).   you * can use multiple facilities with a mlog.
  * if an mlog is already open, then this call will fail.  if you use
  * the message buffer, you prob want it to be 1K or larger.
  *

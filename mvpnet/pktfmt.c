@@ -97,7 +97,7 @@ int pktfmt_arp_req_qrank(uint8_t *ef, int efsz) {
     /* rank is lower 3 bytes of IP address we are asking about */
     qrank = (ef[ARP_TIP_OFF+1] << 16) |
             (ef[ARP_TIP_OFF+2] << 8)  |  ef[ARP_TIP_OFF+3];
-         
+
     return(qrank);
 }
 

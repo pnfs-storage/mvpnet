@@ -38,7 +38,7 @@ find_package(MPI MODULE REQUIRED)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mvp_mlog.h
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/mkmloghdr.sh > 
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/mkmloghdr.sh >
                                      ${CMAKE_CURRENT_BINARY_DIR}/mvp_mlog.h
     DEPENDS mkmloghdr.sh)
 
