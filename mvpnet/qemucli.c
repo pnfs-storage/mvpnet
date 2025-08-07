@@ -52,6 +52,14 @@
 #include "mvp_mlog.h"
 #include "qemucli.h"
 
+/* ethernet adapters to use for our networks */
+#define ADAPTER_MVPNET  "virtio-net-pci"
+#define ADAPTER_USERNET "virtio-net-pci"
+
+/* ethernet mac prefix values we use */
+#define MACPREFIX_MVPNET  0x5255   /* 52:55 + MPI rank for mvp MPI net */
+#define MACPREFIX_USERNET 0x5256   /* 52:56 + MPI world size for usernet */
+
 /*
  * parse qemu-style "argval,prop1=propval1,prop2=propva2,..." args.
  * argval may be omitted (so there is just a list of property values).
@@ -155,6 +163,25 @@ static int qemucli_procarg(char *arg, char **argval, char **pullouts,
         strvec_free(pulls);
     }
     return((goterr) ? -1 : 0);
+}
+
+/*
+ * helper that builds the network device config string (sets the MAC).
+ */
+static int build_netdev_cfgstr(char *out, size_t outlen,
+                               const char *adapter, const char *netdev,
+                               int mac_prefix, int mac_id) {
+    int ret;
+
+    ret = snprintf(out, outlen,
+                   "%s,netdev=%s,mac=%02x:%02x:%02x:%02x:%02x:%02x",
+                   adapter, netdev,
+                   (mac_prefix >> 8) & 0xff, mac_prefix & 0xff,
+                   (mac_id >> 24) & 0xff, (mac_id >> 16) & 0xff,
+                   (mac_id >> 8) & 0xff, mac_id & 0xff);
+    mlog(MVP_DBG, "netdev_cfg: %s%s", out,
+        (ret >= outlen) ? " TRUNCATED!" : "");
+    return ret;
 }
 
 /*
@@ -410,10 +437,8 @@ static int qemucli_socknet_cfg(struct strvec *qvec, int rank, int nettype,
         mlog_exit(1, MVP_CRIT, "append_socknet_cfg: bad nettype %d", nettype);
     }
 
-    if (snprintf(dev, sizeof(dev),
-        "virtio-net-pci,netdev=mvpnet,mac=52:55:%02x:%02x:%02x:%02x",
-        (rank >> 24) & 0xff, (rank >> 16) & 0xff, (rank >> 8) & 0xff,
-        rank & 0xff) >= sizeof(dev))
+    if (build_netdev_cfgstr(dev, sizeof(dev), ADAPTER_MVPNET, "mvpnet",
+                            MACPREFIX_MVPNET, rank) >= sizeof(dev))
         goto done;
 
     /* generate string and append cfg */
@@ -546,10 +571,8 @@ static int qemucli_usernet_cfg(struct strvec *qvec, int rank, int wsize,
         tcmd = ",tftp=";
         tval = tftpdir;
     }
-    if (snprintf(dev, sizeof(dev),
-        "virtio-net-pci,netdev=usernet,mac=52:56:%02x:%02x:%02x:%02x",
-        (wsize >> 24) & 0xff, (wsize >> 16) & 0xff, (wsize >> 8) & 0xff,
-        wsize & 0xff) >= sizeof(dev))
+    if (build_netdev_cfgstr(dev, sizeof(dev), ADAPTER_USERNET, "usernet",
+                            MACPREFIX_USERNET, wsize) >= sizeof(dev))
         goto done;
 
     /* generate string and append cfg */
