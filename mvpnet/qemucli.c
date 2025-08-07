@@ -157,6 +157,26 @@ static int qemucli_procarg(char *arg, char **argval, char **pullouts,
     return((goterr) ? -1 : 0);
 }
 
+
+/*
+ * helper function to build the netdev_str which sets the MAC.
+ */
+static int build_netdev_str(char *out, size_t outlen,
+                            const char *netdev, int mac_prefix,
+                            uint32_t rank)
+{
+    int ret;
+
+    ret = snprintf(out, outlen,
+        "virtio-net-pci,netdev=%s,mac=%02x:%02x:%02x:%02x:%02x:%02x",
+        netdev,
+        (mac_prefix >> 8) & 0xff, mac_prefix & 0xff,
+        (rank >> 24) & 0xff, (rank >> 16) & 0xff,
+        (rank >> 8) & 0xff, rank & 0xff);
+    mlog(MVP_INFO, "Rank %d: netdev %s", rank, out);
+    return ret;
+}
+
 /*
  * insert cloudinit info into the storage qvec when cloudinit has
  * been enabled.   return 0 on success, -1 on error.
@@ -410,10 +430,7 @@ static int qemucli_socknet_cfg(struct strvec *qvec, int rank, int nettype,
         mlog_exit(1, MVP_CRIT, "append_socknet_cfg: bad nettype %d", nettype);
     }
 
-    if (snprintf(dev, sizeof(dev),
-        "virtio-net-pci,netdev=mvpnet,mac=52:55:%02x:%02x:%02x:%02x",
-        (rank >> 24) & 0xff, (rank >> 16) & 0xff, (rank >> 8) & 0xff,
-        rank & 0xff) >= sizeof(dev))
+    if (build_netdev_str(dev, sizeof(dev), "mvpnet", 0x5255, rank) >= sizeof(dev))
         goto done;
 
     /* generate string and append cfg */
@@ -546,10 +563,7 @@ static int qemucli_usernet_cfg(struct strvec *qvec, int rank, int wsize,
         tcmd = ",tftp=";
         tval = tftpdir;
     }
-    if (snprintf(dev, sizeof(dev),
-        "virtio-net-pci,netdev=usernet,mac=52:56:%02x:%02x:%02x:%02x",
-        (wsize >> 24) & 0xff, (wsize >> 16) & 0xff, (wsize >> 8) & 0xff,
-        wsize & 0xff) >= sizeof(dev))
+    if (build_netdev_str(dev, sizeof(dev), "usernet", 0x5256, wsize) >= sizeof(dev))
         goto done;
 
     /* generate string and append cfg */
