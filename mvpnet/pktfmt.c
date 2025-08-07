@@ -74,12 +74,19 @@ static uint8_t arp_rep_hdr[8] = {
 #define ARP_SIZE           (ARP_TIP_OFF+IP_ADDRSZ)     /* incl ether header */
 
 /*
- * check if the frame is a broadcast ARP request packet.  if
- * so, return the rank being queried.  if it is not a valid
- * ARP request packet, return -1.
+ * check if the frame is a valid broadcast ARP request packet.
+ * return 0 if so, otherwise return -1.   we return the MPI
+ * rank being queried in qrankp.  the caller should validate
+ * this value to determine if it should respond to the ARP request.
+ *
+ * note that the encoded rank in the IP address is offset by
+ * 1 to avoid using IP address 10.0.0.0 for rank 0 (some older
+ * kernels are hardwired to treat 10.0.0.0 as a broadcast address...
+ * this prevents it from being used as a normal address).
+ * Thus, rank 0 is 10.0.0.1, rank 1 is 10.0.0.2, etc.
  */
-int pktfmt_arp_req_qrank(uint8_t *ef, int efsz) {
-    int qrank;
+int pktfmt_arp_req_qrank(uint8_t *ef, int efsz, int *qrankp) {
+    int oqrank;
 
     /* must be an ethernet broadcast */
     if (memcmp(&ef[ETH_DSTOFF], ether_bcast, sizeof(ether_bcast)) != 0)
@@ -94,11 +101,12 @@ int pktfmt_arp_req_qrank(uint8_t *ef, int efsz) {
     if (memcmp(&ef[ARP_HDR_OFF], arp_req_hdr, ARP_HDR_SIZE) != 0)
         return(-1);
 
-    /* rank is lower 3 bytes of IP address we are asking about */
-    qrank = (ef[ARP_TIP_OFF+1] << 16) |
-            (ef[ARP_TIP_OFF+2] << 8)  |  ef[ARP_TIP_OFF+3];
+    /* offset rank is the lower 3 bytes of IP address we are asking about */
+    oqrank = (ef[ARP_TIP_OFF+1] << 16) |
+             (ef[ARP_TIP_OFF+2] << 8)  |  ef[ARP_TIP_OFF+3];
 
-    return(qrank);
+    *qrankp = oqrank - 1;   /* remove offset to return MPI rank */
+    return(0);
 }
 
 /*
