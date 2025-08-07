@@ -99,6 +99,7 @@ struct fdio_args {
     char **socknames;        /* unix domain socket filenames */
     int *sockfds;            /* socket file descriptors */
     FILE *confp;             /* if not NULL, print console output here */
+    uint32_t ssh_timeout_sec;  /* timeout for ssh probe (default 60s) */
 
     /* mvp queuing area (w/notify pipe) ... shared with MPI thread */
     struct mvp_queuing *mq;  /* see mvp_queuing for locking info */
@@ -120,6 +121,7 @@ struct fdio_args {
     (struct fdio_args) {                                                       \
         .flk = PTHREAD_MUTEX_INITIALIZER, .fcond = PTHREAD_COND_INITIALIZER,   \
         .fdio_state = FDIO_NONE, .nettype = -1,                                \
+	.ssh_timeout_sec = 60,                                                 \
     }
 
 void *fdio_main(void *arg);

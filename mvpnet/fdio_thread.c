@@ -151,7 +151,9 @@ static void *fdio_sshprobe(void *arg) {
     char line[128];
 
     note = FDIO_NOTE_NOSSHD;   /* default is to fail... */
-    ms_left = 60 * 1000;       /* wait up to 60 seconds for sshd */
+    ms_left = a->ssh_timeout_sec * 1000;    /* wait so many seconds for sshd */
+    mlog(FDIO_INFO, "sshprobe: wait for VM ssh prompt for %d secs on port %d", 
+	            a->ssh_timeout_sec, ntohs(sin.sin_port));
 
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -216,6 +218,9 @@ static void *fdio_sshprobe(void *arg) {
     }
 
 done:
+    if (note == FDIO_NOTE_NOSSHD) {
+	mlog(FDIO_CRIT, "sshprobe: timeout after 60 seconds on port %d", ntohs(sin.sin_port));
+    }
     /* notify parent thread we are done and our status */
     if (write(a->mq->fdio_notify[NOTE_WR], &note, 1) < 0)
         fprintf(stderr, "write: NOTE_WR: %s\n", strerror(errno));
