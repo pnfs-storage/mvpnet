@@ -95,6 +95,7 @@ struct fdio_args {
     struct strvec *qvec;     /* qemu command line for exec */
     struct mpiinfo mi;       /* copy of mpi info for this proc */
     int localsshport;        /* local port to reach guest sshd on */
+    int sshprobe_timeout;    /* timeout for ssh probe (secs) */
     int nettype;             /* network type (SOCK_STREAM or SOCK_DGRAM) */
     char **socknames;        /* unix domain socket filenames */
     int *sockfds;            /* socket file descriptors */

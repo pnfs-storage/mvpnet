@@ -150,8 +150,8 @@ static void *fdio_sshprobe(void *arg) {
     struct pollfd pf;
     char line[128];
 
-    note = FDIO_NOTE_NOSSHD;   /* default is to fail... */
-    ms_left = 60 * 1000;       /* wait up to 60 seconds for sshd */
+    note = FDIO_NOTE_NOSSHD;               /* default is to fail... */
+    ms_left = a->sshprobe_timeout * 1000;  /* timeout (cvt from secs) */
 
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -864,6 +864,8 @@ void *fdio_main(void *arg) {
      * if we can connect to the guest's sshd and get a sshd banner, then
      * we consider the guest fully booted.
      */
+    mlog(FDIO_INFO, "launching sshprobe thread (localport=%d, timeout=%d)",
+        a->localsshport, a->sshprobe_timeout);
     ret = pthread_create(&sshprobe.pth, NULL, fdio_sshprobe, a);
     if (ret != 0) {
         mlog(FDIO_CRIT, "main: pthread_create sshprobe failed (%d)", ret);

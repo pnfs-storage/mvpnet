@@ -200,6 +200,8 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-S [pri]    mlog stderr priority (def=%s)\n",
             defs.stderrpri_ml);
     fprintf(stderr, "\t-t [dir]    tftp dir (enables tftpd)\n");
+    fprintf(stderr, "\t-T [sec]    sshd start probe timeout (secs, def=%d)\n",
+            defs.sshprobe_timeout);
     fprintf(stderr, "\t-u [usr]    username on guest (for ssh)\n");
     fprintf(stderr, "\t-w [val]   *wrapper log on (1) or off (0) (def=%d)\n",
             defs.wraplog);
@@ -271,7 +273,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:u:w:X:")) != -1) {
+                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -427,6 +429,12 @@ int main(int argc, char **argv) {
                 rmerror(mii.rank, 0, "tftpdir: %s: bad stringcheck",
                         mopt.tftpdir);
             break;
+	case 'T':
+            mopt.sshprobe_timeout = atoi(optarg);
+            if (mopt.sshprobe_timeout < 1)
+                rmerror(mii.rank, 0, "sshprobe_timeout: %s: invalid arg",
+                        optarg);
+	    break;
         case 'u':
             mopt.username = optarg;
             for (cp = optarg ; *cp ; cp++) {
@@ -597,6 +605,7 @@ int main(int argc, char **argv) {
     if (mopt.rundir)
         mlog(MVP_NOTE, "rundir: %s", mopt.rundir);
     mlog(MVP_NOTE, "localport: %d", localport);
+    mlog(MVP_NOTE, "sshprobe_timeout: %d", mopt.sshprobe_timeout);
     if (qemuvec.base == NULL) {
         mlog(MVP_NOTE, "qemuvec: <null>");
     } else {
@@ -643,6 +652,7 @@ int main(int argc, char **argv) {
     fdioargs.qvec = &qemuvec;
     fdioargs.mi = mii;     /* struct copy */
     fdioargs.localsshport = localport;
+    fdioargs.sshprobe_timeout = mopt.sshprobe_timeout;
     fdioargs.nettype = mopt.nettype;
     fdioargs.socknames = socknames;
     fdioargs.sockfds = sockfds;
