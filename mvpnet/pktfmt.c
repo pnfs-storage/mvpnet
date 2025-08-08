@@ -71,7 +71,7 @@ static uint8_t arp_rep_hdr[8] = {
 #define ARP_THW_OFF        (ARP_SIP_OFF+IP_ADDRSZ)     /* target hw addr */
 #define ARP_TIP_OFF        (ARP_THW_OFF+ETH_ADDRSIZE)  /* target ip addr */
 
-#define ARP_SIZE            (ARP_TIP_OFF+IP_ADDRSZ)    /* incl ether header */
+#define ARP_SIZE           (ARP_TIP_OFF+IP_ADDRSZ)     /* incl ether header */
 
 /*
  * check if the frame is a broadcast ARP request packet.  if
@@ -81,7 +81,7 @@ static uint8_t arp_rep_hdr[8] = {
 int pktfmt_arp_req_qrank(uint8_t *ef, int efsz) {
     int qrank;
 
-    /* must be an ethernt broadcast */
+    /* must be an ethernet broadcast */
     if (memcmp(&ef[ETH_DSTOFF], ether_bcast, sizeof(ether_bcast)) != 0)
         return(-1);
 
@@ -105,7 +105,7 @@ int pktfmt_arp_req_qrank(uint8_t *ef, int efsz) {
  * generate ARP reply message from ARP request message.  caller
  * must ensure req and rep are the correct size.
  */
-void pkgfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep) {
+void pktfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep) {
 
     /*
      * set up ethernet frame header.  reply dst is req source.

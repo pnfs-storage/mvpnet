@@ -48,6 +48,6 @@
 #define ETH_DATAOFF  (ETH_TYPEOFF+2)     /* data offset */
 
 int pktfmt_arp_req_qrank(uint8_t *ef, int efsz);
-void pkgfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep);
+void pktfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep);
 
 #endif /* MVP_PKTFMT_H */

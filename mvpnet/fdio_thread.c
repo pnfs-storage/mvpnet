@@ -69,7 +69,7 @@
 #define PF_ST_LISTEN     3   /* stream: listening socket fd */
 #define PF_ST_CONN       4   /* stream: connected socket (if connected) */
 #define PF_DG_QOUT       3   /* dgram: qemu pkt output (we recv()) */
-#define PF_DG_QIN        4   /* dgram: qemu pkg input (we send()) */
+#define PF_DG_QIN        4   /* dgram: qemu pkt input (we send()) */
 #define PF_NFDS          5   /* size of pfd[] array needed */
 
 /* struct with qemu sender state */
@@ -308,7 +308,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
         /* generate reply - size does not change */
         if (xtrahdrsz > 0)
             memcpy(rep_fstart, fstart, xtrahdrsz);
-        pkgfmt_arp_mkreply(efrm, arp_qrank, rep_frm);
+        pktfmt_arp_mkreply(efrm, arp_qrank, rep_frm);
 
         /*
          * add to recvq.  we do not need to notify ourselves since
