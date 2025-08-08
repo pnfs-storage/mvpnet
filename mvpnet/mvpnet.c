@@ -166,6 +166,7 @@ static int stringcheck(char *in, int xtra) {
  */
 void usage(char *prog, int rank) {
     struct mvpopts defs = MVPOPTS_INIT;
+    struct fdio_args fdio_defs = FDIO_ARGS_INIT;
 
     /* avoid output jumble by only having rank 0 print usage */
     if (rank != 0)
@@ -200,6 +201,8 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-S [pri]    mlog stderr priority (def=%s)\n",
             defs.stderrpri_ml);
     fprintf(stderr, "\t-t [dir]    tftp dir (enables tftpd)\n");
+    fprintf(stderr, "\t-T [sec]    ssh timeout in seconds (default %d",
+	    fdio_defs.ssh_timeout_sec); 
     fprintf(stderr, "\t-u [usr]    username on guest (for ssh)\n");
     fprintf(stderr, "\t-w [val]   *wrapper log on (1) or off (0) (def=%d)\n",
             defs.wraplog);
@@ -271,7 +274,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:u:w:X:")) != -1) {
+                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -427,6 +430,9 @@ int main(int argc, char **argv) {
                 rmerror(mii.rank, 0, "tftpdir: %s: bad stringcheck",
                         mopt.tftpdir);
             break;
+	case 'T':
+	    fdioargs.ssh_timeout_sec = atoi(optarg);
+	    break;
         case 'u':
             mopt.username = optarg;
             for (cp = optarg ; *cp ; cp++) {
