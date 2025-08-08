@@ -47,7 +47,7 @@ while (<$ip>) {
     $try = $1;
     next unless ($try =~ /^52:(\d\d):(\d\d):(\d\d):(\d\d):(\d\d)$/);
     $type = $1;
-    $val = (int($3) << 16) || (int($4) << 8) || int($5);
+    $val = (int($3) << 16) | (int($4) << 8) | int($5);
     if ($type == 56) {
         $wsize = $val;
     } elsif ($type == 55 && /^\d+: (\w+): /) {
