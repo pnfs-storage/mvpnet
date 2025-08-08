@@ -13,33 +13,32 @@ die () {
   exit 1
 }
 
-# these are gross...
-mvpmac2num () {
-  # take the special mvp format and convert it to a number
+mvpmac2rank () {
+  # take the special mvp mac format and convert it to a rank number
   echo ${1} | tr ':' ' ' | while read a b c; do
-    sa=$(($((a))<<16))
-    sb=$(($((b))<<8))
-    sc=$(($((c))))
-    echo $(($sa+$sb+$sc))
+    sa=$((0x${a}<<16))
+    sb=$((0x${b}<<8))
+    sc=$((0x${c}))
+    echo $((${sa}+${sb}+${sc}))
   done
 }
 
-num2mvpmac () {
-  # take a number and convert it to the special format suitable for mvp mac or ip
-  a=$(printf "%02d" $(($((${1}>>16))&0xff)))
-  b=$(printf "%02d" $(($((${1}>>8))&0xff)))
-  c=$(printf "%02d" $(($((${1}))&0xff)))
-  echo "${a}:${b}:${c}"
+rank2mvpip () {
+  # take a rank number and convert it to the special mvp ip
+  a=$((${1}>>16&0xff))
+  b=$((${1}>>8&0xff))
+  c=$((${1}&0xff))
+  echo "10.${a}.${b}.${c}"
 }
 
 ip -br link > /dev/null || die "cannot open ip link"
 
 eval $(ip -br l | while read iface status mac rest; do
   if (echo ${mac} | grep -q "^52:56"); then
-    echo wsize=$(mvpmac2num $(echo ${mac} | cut -f4-6 -d":"))
+    echo wsize=$(mvpmac2rank $(echo ${mac} | cut -f4-6 -d":"))
     echo useriface=${iface}
   elif (echo ${mac} | grep -q "^52:55"); then
-    echo rank=$(mvpmac2num $(echo ${mac} | cut -f4-6 -d":"))
+    echo rank=$(mvpmac2rank $(echo ${mac} | cut -f4-6 -d":"))
     echo mvpiface=${iface}
   fi
 done)
@@ -66,7 +65,9 @@ cp /etc/hosts /tmp/mvphosts || die "couldn't write temporary hosts file"
 (grep -vE "^#wsize: |^10\." /tmp/mvphosts; echo "#wsize: ${wsize}";
   for i in $(seq 0 $((${wsize}-1))); do
     lcv=$(printf "n%04d" ${i})
-    ip="$(printf "10.%d.%d.%d" $(num2mvpmac ${i}|tr ':' ' '))"
+    # the real IP address is one bit more than what we get from the rank
+    n=$((${i}+1))
+    ip=$(rank2mvpip ${n})
     echo ${ip} ${lcv}
   done) > /etc/hosts || die "couldn't write /etc/hosts"
 
@@ -81,9 +82,11 @@ if [ -n ${mvpiface} ]; then
   ip -br addr show dev ${mvpiface} > /dev/null || die "cannot open ip inet"
   addrs=$(ip -br addr show dev ${mvpiface} | awk '{print $3}')
   if [ -n ${addrs} ]; then
-    myaddr=$(printf "10.%d.%d.%d/8" $(num2mvpmac ${rank}|tr ':' ' '))
+    # the real IP address is one bit more than what we get from the rank
+    n=$((${rank}+1))
+    myaddr=$(rank2mvpip ${n})/8
     echo "assign addr ${myaddr} to ${mvpiface}"
-    ip addr add ${myaddr} dev ${mvpiface} || die "ip failed"
+    ip addr add ${myaddr} broadcast 10.255.255.255 dev ${mvpiface} || die "ip failed"
   else
     echo "${mvpiface} already has an ip address"
   fi

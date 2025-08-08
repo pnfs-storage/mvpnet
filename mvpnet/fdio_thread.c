@@ -282,12 +282,13 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
      * case 2: broadcast ARP request.  we can directly answer these
      * since we know the mapping from MPI rank to IP and ethernet addrs.
      */
-    if ((arp_qrank = pktfmt_arp_req_qrank(efrm, nbytes - xtrahdrsz)) != -1) {
+    if (pktfmt_arp_req_qrank(efrm, nbytes - xtrahdrsz, &arp_qrank) != -1) {
         void *rep_fstart;
         struct fbuf *rep_fbuf;
         uint8_t *rep_frm;
 
-        if (arp_qrank >= a->mi.wsize || arp_qrank == a->mi.rank) {
+        if (arp_qrank < 0 || arp_qrank >= a->mi.wsize ||
+            arp_qrank == a->mi.rank) {
             a->fst.arpreq_badreq++;
             mlog(FDIO_INFO, "pqframe: bad bcast-ARP for %d, drop!", arp_qrank);
             return;  /* drop req if unknown rank or for self */

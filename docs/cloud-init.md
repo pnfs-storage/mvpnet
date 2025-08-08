@@ -96,10 +96,10 @@ the other VMs in this MPI job can be accessed over the mvpnet (10.0.0.0/8):
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
 
 #wsize: 4
-10.0.0.0 n0000
-10.0.0.1 n0001
-10.0.0.2 n0002
-10.0.0.3 n0003
+10.0.0.1 n0000
+10.0.0.2 n0001
+10.0.0.3 n0002
+10.0.0.4 n0003
 [root@n0000 ~]# ssh n0003
 Warning: Permanently added 'n0003' (ED25519) to the list of known hosts.
 Activate the web console with: systemctl enable --now cockpit.socket

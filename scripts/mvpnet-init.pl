@@ -38,7 +38,7 @@ sub savefile {
 
 
 my($ip, $try, $type, $val, $wsize, $rank, $iface);
-my($h, @hosts, $lcv, @mpihosts, $gotinet, $myaddr, $rv);
+my($h, @hosts, $lcv, $noffset, @mpihosts, $gotinet, $myaddr, $rv);
 
 open($ip, "ip -o -f link addr|") || die "cannot open ip link";
 while (<$ip>) {
@@ -76,8 +76,11 @@ while (<$h>) {
 close($h);
 push(@hosts, "#wsize: $wsize\n");
 for ($lcv = 0 ; $lcv < $wsize ; $lcv++) {
-    push(@hosts, sprintf("10.%d.%d.%d\tn%04d\n", ($lcv >> 16) & 0xff,
-          ($lcv >> 8) & 0xff, $lcv & 0xff, $lcv));
+    # we offset rank by 1 to avoid using 10.0.0.0.  this matches with the
+    # code in mvpnet's pktfmt_arp_req_qrank()...
+    $noffset = $lcv + 1;
+    push(@hosts, sprintf("10.%d.%d.%d\tn%04d\n", ($noffset >> 16) & 0xff,
+          ($noffset >> 8) & 0xff, $noffset & 0xff, $lcv));
     push(@mpihosts, sprintf("n%04d\n", $lcv));
 }
 
@@ -103,10 +106,13 @@ if (defined($rank)) {
     }
     close($ip);
     if ($gotinet == 0) {
-        $myaddr = sprintf("10.%d.%d.%d/8", ($rank >> 16) & 0xff,
-                          ($rank >> 8) & 0xff, $rank & 0xff);
+        # account for the IP offset that let's us avoid using 10.0.0.0
+        $noffset = $rank + 1;
+        $myaddr = sprintf("10.%d.%d.%d/8", ($noffset >> 16) & 0xff,
+                          ($noffset >> 8) & 0xff, $noffset & 0xff);
         print "assign addr $myaddr to $iface\n";
-        $rv = system "ip", "addr", "add", $myaddr, "dev", $iface;
+        $rv = system "ip", "addr", "add", $myaddr,
+              "broadcast", "10.255.255.255", "dev", $iface;
         die "ip failed" if ($rv);
     } else {
         print "$iface already has an ip address\n";

@@ -83,14 +83,14 @@ On the rank 0 guest, get a root shell and bring up the ens3 interface:
 % ssh -p 2201 localhost
 ...
 :~$ sudo -H /bin/bash
-# ip addr add 10.0.0.0/8 dev ens3
+# ip addr add 10.0.0.1/8 broadcast 10.255.255.255 dev ens3
 # ip link set ens3 up
 </pre>
 
-On the rank 1 guest, repeat the above with the address 10.0.0.1/8 instead
-of 10.0.0.0.
+On the rank 1 guest, repeat the above with the address 10.0.0.2/8 instead
+of 10.0.0.1.
 
-XXX: ssh keys not right for logging in between 10.0.0.0 and 10.0.0.1.
+XXX: ssh keys not right for logging in between 10.0.0.1 and 10.0.0.2.
 ssh will connect over the MPI network, but you will not be able to login.
 
 To shutdown the mvpnet demo you must halt and power off both VMs.
