@@ -63,9 +63,10 @@ struct mvpopts {
     char *qemucmd;         /* qemu command */
     char *rundir;          /* runtime directory to copy image to */
     char *sockdir;         /* directory to put sockets in */
+    int sshprobe_timeout;  /* ssh probe timeout (secs) */
+    char *stderrpri_ml;    /* stderr mlog priority */
     char *tftpdir;         /* tftp dir (enables tftpd) */
     char *username;        /* username to login to on guest */
-    char *stderrpri_ml;    /* stderr mlog priority */
     int wraplog;           /* enable monwrap log file */
     char *xmask_ml;        /* mlog mask */
 };
@@ -77,7 +78,7 @@ struct mvpopts {
         .image = STRVEC_INIT, .kvm = 1, .logdir = "/tmp", .mem_mb = 4096,      \
         .monwrap = "monwrap", .nettype = SOCK_STREAM,                          \
         .processor = "host", .qemucmd = "qemu-system-x86_64",                  \
-        .sockdir = "/tmp", .stderrpri_ml = "CRIT"                              \
+        .sockdir = "/tmp", .sshprobe_timeout = 90, .stderrpri_ml = "CRIT"      \
     }
 
 /* struct to track if a pthread is running */
