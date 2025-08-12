@@ -267,7 +267,8 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             fbuf_loan(fbuf);        /* establish loan */
             sqe = mvp_sq_queue(a->mq, dst_rank, fstart, nbytes, fbuf);
             if (sqe == NULL) {
-                mlog(FDIO_CRIT, "pqframe: sqe/c1 alloc failed - dropping");
+                if (!mvp_sq_draining(a->mq))   /* ok if draining */
+                    mlog(FDIO_CRIT, "pqframe: sqe/c1 alloc failed - dropping");
                 fbuf_return(fbuf);  /* failed, drop the loan */
             } else {
                 a->fst.unicast_cnt++;
@@ -353,7 +354,8 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             fbuf_loan(fbuf);                    /* establish loan */
             sqe = mvp_sq_queue(a->mq, children[lcv], fstart, nbytes, fbuf);
             if (sqe == NULL) {
-                mlog(FDIO_CRIT, "pqframe: bcast drop: no sqe%d space", lcv);
+                if (!mvp_sq_draining(a->mq))    /* ok if draining */
+                    mlog(FDIO_CRIT, "pqframe: bcast drop: no space (%d)", lcv);
                 fbuf_return(fbuf);  /* failed, drop the loan */
             } else {
                 mlog(FDIO_DBG, "pqframe: bcast c%d sqe=%p, fb=%p",
@@ -490,7 +492,8 @@ static void fdio_read_qconsole(struct fdio_args *a, struct pollfd *pf,
  * everything (including our thread) is part of the same process.
  */
 static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
-                                    int *finalstate, struct runthread *sshp) {
+                                    int *finalstate, struct runthread *sshp,
+                                    int *qstdinp) {
     char buf;
     ssize_t got;
     int ret;
@@ -558,6 +561,13 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
          * and process the mpirecvq before calling poll again, so no
          * further action is required here.
          */
+        break;
+    case FDIO_NOTE_DRAINED:      /* mpisendq drain complete */
+        mlog(FDIO_DBG, "readnote: DRAINED");
+        if (*qstdinp >= 0) {     /* send EOF to qemu by closing its stdin */
+            close(*qstdinp);
+            *qstdinp = -1;
+        }
         break;
     default:
         mlog_exit(1, FDIO_CRIT, "readnote: unknown note %d!", buf);
@@ -706,8 +716,9 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
         sqe = mvp_sq_queue(a->mq, children[lcv], copy, curq->rqe->flen,
                            copy_fbuf);
         if (sqe == NULL) {
-            mlog(FDIO_CRIT, "loadnext: bcast sqe alloc fail for %d, drop",
-                 children[lcv]);
+            if (!mvp_sq_draining(a->mq))      /* ok if draining */
+                mlog(FDIO_CRIT, "loadnext: bcast sqe alloc fail for %d, drop",
+                     children[lcv]);
             fbuf_return(copy_fbuf);  /* failed, drop the loan */
         } else {
             mlog(FDIO_DBG, "loadnext: q bcastcopy sqe=%p, dst=%d",
@@ -916,7 +927,7 @@ void *fdio_main(void *arg) {
             }
             if (pfd[PF_NOTIFY].revents & (POLLIN|POLLHUP)) {
                 fdio_read_notifications(a, &pfd[PF_NOTIFY], &final_state,
-                                        &sshprobe);
+                                        &sshprobe, &qemu_stdin);
                 if (final_state != FDIO_NONE)
                     break;
             }

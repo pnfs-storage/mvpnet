@@ -256,9 +256,10 @@ int mvp_notify_fdio(struct mvp_queuing *mq, char note) {
  */
 struct sendq_entry *mvp_sq_queue(struct mvp_queuing *mq, int dest,
                                  char *frame, int len, struct fbuf *owner) {
-    struct sendq_entry *sqe;
+    struct sendq_entry *sqe = NULL;
     pthread_mutex_lock(&mq->qlock);
-    sqe = mvp_sqe_alloc(mq);
+    if (!mvp_sq_draining(mq))         /* only allow queue if not draining */
+        sqe = mvp_sqe_alloc(mq);
     if (sqe) {
         sqe->dest = dest;
         sqe->frame = frame;
@@ -271,8 +272,8 @@ struct sendq_entry *mvp_sq_queue(struct mvp_queuing *mq, int dest,
         mlog(QUE_DBG, "sq_queue sqe=%p, dest=%d, len=%d, fbuf=%p, qlen=%d",
              sqe, dest, len, owner, mq->mpisqlen);
     } else {
-        mlog(QUE_ERR, "sq_queue sqe=FAILED, dest=%d, len=%d, fbuf=%p",
-             dest, len, owner);
+        mlog(QUE_ERR, "sq_queue sqe=FAILED, dest=%d, len=%d, fbuf=%p, drn=%d",
+             dest, len, owner, mvp_sq_draining(mq));
     }
     pthread_mutex_unlock(&mq->qlock);
 
@@ -291,6 +292,7 @@ struct sendq_entry *mvp_sq_dequeue(struct mvp_queuing *mq) {
     if (sqe) {
         TAILQ_REMOVE(&mq->mpisendq, sqe, sq);
         mq->mpisqlen--;
+        mq->mpisndequeued++;
         mlog(QUE_DBG, "sq_dequeue sqe=%p", sqe);
     }
     pthread_mutex_unlock(&mq->qlock);
@@ -299,13 +301,45 @@ struct sendq_entry *mvp_sq_dequeue(struct mvp_queuing *mq) {
 }
 
 /*
- * release a sendq_entry to free list for reuse.
+ * release a dequeued sendq_entry to free list for reuse.
  */
 void mvp_sq_release(struct mvp_queuing *mq, struct sendq_entry *sqe) {
+    int just_drained;
+
     mlog(QUE_DBG, "sq_release sqe=%p", sqe);
     pthread_mutex_lock(&mq->qlock);
+    mq->mpisndequeued--;
     TAILQ_INSERT_HEAD(&mq->mpisndfree, sqe, sq);
+    just_drained = (mq->mpisq_draindown != 0 && mq->mpisqlen == 0 &&
+                    mq->mpisndequeued == 0);
     pthread_mutex_unlock(&mq->qlock);
+
+    if (just_drained) {
+        mlog(QUE_DBG, "sq_release: just drained!");
+        (void) mvp_notify_fdio(mq, FDIO_NOTE_DRAINED);
+    }
+}
+
+/*
+ * start mpisendq draindown operation so we can shutdown.  this
+ * sets mpisq_draindown which blocks any additional sqes from
+ * being added to mpisendq.   we return the number of outstanding
+ * sqes (either in mpisendq or being processed by MPI).   if
+ * we return 0, then caller can do the next step of the shutdown now.
+ * otherwise, the caller should wait for a FDIO_NOTE_DRAINED notification
+ * before moving forward.
+ */
+int mvp_sq_draindown(struct mvp_queuing *mq) {
+    int old, rv;
+
+    pthread_mutex_lock(&mq->qlock);
+    old = mq->mpisq_draindown;
+    mq->mpisq_draindown = 1;
+    rv = mq->mpisqlen + mq->mpisndequeued;
+    pthread_mutex_unlock(&mq->qlock);
+
+    mlog(QUE_DBG, "sq_draindown (old=%d, rv=%d)", old, rv);
+    return(rv);
 }
 
 /*

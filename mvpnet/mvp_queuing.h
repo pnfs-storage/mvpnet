@@ -191,6 +191,8 @@ struct mvp_queuing {
     struct sendqlist mpisendq;    /* MPI send queue */
     int mpisqlen;                 /* #sqes on sendq */
     int mpimaxsqlen;              /* max size sendq has grown to */
+    int mpisndequeued;            /* #dequeued sqes mpi thread is processing */
+    int mpisq_draindown;          /* != 0 if draining mpisendq for shutdown */
     struct sendqlist mpisndfree;  /* list of free sendq_entry structs */
     int nsqe;                     /* number of sqes allocated */
     struct recvqlist mpirecvq;    /* MPI recv queue */
@@ -207,6 +209,13 @@ struct sendq_entry *mvp_sq_queue(struct mvp_queuing *mq, int dest,
                                  char *frame, int len, struct fbuf *owner);
 struct sendq_entry *mvp_sq_dequeue(struct mvp_queuing *mq);
 void mvp_sq_release(struct mvp_queuing *mq, struct sendq_entry *sqe);
+
+int mvp_sq_draindown(struct mvp_queuing *mq);
+#define mvp_sq_draining(MQ) ((MQ)->mpisq_draindown != 0)
+/*
+ * note: mpisq_draindown is only written by fdio_thread, so it is safe
+ * for fdio_thread itself to read mpisq_draindown without holding qlock.
+ */
 
 struct recvq_entry *mvp_rq_alloc(struct mvp_queuing *mq, int sz);
 void mvp_rq_queue(struct mvp_queuing *mq, struct recvq_entry *rqe);

@@ -60,6 +60,7 @@
 #define FDIO_NOTE_SSHD    2  /* running sshd detected */
 #define FDIO_NOTE_NOSSHD  3  /* sshd failed to start before timeout */
 #define FDIO_NOTE_QUEUE   4  /* check MPI queue for input data */
+#define FDIO_NOTE_DRAINED 5  /* mpisendq drain complete */
 
 /*
  * stats collected by fdio thread
