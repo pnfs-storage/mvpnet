@@ -112,12 +112,13 @@ static void fdio_qemusend_done(struct fdio_args *a, struct qemusender *curq) {
 /*
  * routing function for a simple binary broadcast tree on top of
  * MPI ranks.   each rank has 0, 1, or 2 next hops depending on
- * the size of the tree and their location in it.   the ranks of
- * the next hops are returned in children[].  -1 is returned if
- * there is no hop for that branch.
+ * the size of the tree and their location in it.  this function
+ * returns the number of children this rank has in the tree.
+ * if there are children (i.e. our return value is > 0), their
+ * rank numbers are returned in the children[] array.
  */
-static void fdio_binary_router(int root_rank, int world_size,
-                               int my_rank, int children[2]) {
+static int fdio_binary_router(int root_rank, int world_size,
+                              int my_rank, int children[2]) {
     int my_adjusted_rank, adjusted_child0;
 
     /* shift all ranks so that root_rank is rank 0 in the adjusted world */
@@ -127,17 +128,21 @@ static void fdio_binary_router(int root_rank, int world_size,
 
     adjusted_child0 = (my_adjusted_rank * 2) + 1;
     if (adjusted_child0 >= world_size) {
-        children[0] = children[1] = -1;
-    } else {
-        children[0] = (adjusted_child0 + root_rank) % world_size;
-        if (adjusted_child0 == world_size - 1) {
-            children[1] = -1;
-        } else {
-            children[1] = (children[0] + 1) % world_size;
-        }
+        mlog(FDIO_DBG, "binary_router: root=%d, me=%d, children=[]",
+             root_rank, my_rank);
+        return(0);    /* no children */
     }
+    children[0] = (adjusted_child0 + root_rank) % world_size;
+    if (adjusted_child0 == world_size - 1) {
+        mlog(FDIO_DBG, "binary_router: root=%d, me=%d, children=[%d]",
+             root_rank, my_rank, children[0]);
+        return(1);    /* one child */
+    }
+    children[1] = (children[0] + 1) % world_size;
     mlog(FDIO_DBG, "binary_router: root=%d, me=%d, children=[%d,%d]",
          root_rank, my_rank, children[0], children[1]);
+
+    return(2);        /* two children */
 }
 
 /* ssh probe thread main */
@@ -337,16 +342,14 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
      * tree and send the data there.  we will have 0, 1, or 2 next hops.
      */
     {
-        int children[2];       /* in broadcast tree */
+        int nc, children[2];       /* in broadcast tree */
 
         a->fst.bcast_st_cnt++;
         a->fst.bcast_st_bytes += nbytes;
         mlog(FDIO_DBG, "pqframe: bcast start from %d - routing", a->mi.rank);
-        fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank, children);
+        nc = fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank, children);
 
-        for (int lcv = 0 ; lcv < 2; lcv++) {
-            if (children[lcv] == -1)
-                continue;
+        for (int lcv = 0 ; lcv < nc; lcv++) {
             fbuf_loan(fbuf);                    /* establish loan */
             sqe = mvp_sq_queue(a->mq, children[lcv], fstart, nbytes, fbuf);
             if (sqe == NULL) {
@@ -638,7 +641,7 @@ static void fdio_read_dgqout(struct fdio_args *a, struct pollfd *pf,
 static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     int xtrahdrsz = (a->nettype == SOCK_STREAM) ? 4 : 0;
     uint8_t *efrm;
-    int src_rank, children[2], nchildren, lcv;
+    int src_rank, children[2], nchild, lcv;
     void *copy;
     struct fbuf *copy_fbuf;
     struct sendq_entry *sqe;
@@ -674,14 +677,12 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
 
     /* compute children in bcast tree */
     mlog(FDIO_DBG, "loadnext: bcast from rank %d - routing!", src_rank);
-    fdio_binary_router(src_rank, a->mi.wsize, a->mi.rank, children);
-    nchildren = ((children[0] != -1) ? 1 : 0) +
-                ((children[1] != -1) ? 1 : 0);
+    nchild = fdio_binary_router(src_rank, a->mi.wsize, a->mi.rank, children);
 
     /* send copies to any children we have */
     a->fst.bcastin_cnt++;
     a->fst.bcastin_bytes += curq->rqe->flen;
-    if (nchildren == 0)
+    if (nchild == 0)
         return;                          /* done, no children to forward to */
 
     /* copy frame to fbm_bcast for forwarding */
@@ -692,14 +693,11 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
         return;
     }
     memcpy(copy, curq->rqe->frame, curq->rqe->flen);
-    if (nchildren > 1) {
+    if (nchild > 1) {
         fbuf_loan(copy_fbuf);  /* additional loan for second child */
     }
 
-    for (lcv = 0 ; lcv < 2 ; lcv++) {
-        if (children[lcv] == -1)
-            continue;
-
+    for (lcv = 0 ; lcv < nchild ; lcv++) {
         mlog(FDIO_DBG, "loadnext: bcast to %d loan on fb=%p", children[lcv],
              copy_fbuf);
 
