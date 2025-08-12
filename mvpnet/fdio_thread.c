@@ -447,8 +447,10 @@ static void fdio_read_stdin(struct fdio_args *a, struct pollfd *pf,
     got = read(pf->fd, buf, sizeof(buf));
     if (got < 1) {
         mlog(FDIO_DBG, "stdin: read rv=%zd, set DONE", got);
-        *finalstate = FDIO_DONE;    /* EOF/error: exit poll loop */
-    } else {
+        *finalstate = FDIO_DONE;         /* EOF/error: exit poll loop */
+        return;
+    }
+    if (qstdin >= 0) {                   /* only relay if qstdin is open */
         a->fst.stdin_cnt++;
         a->fst.stdin_bytes += got;
         got = write(qstdin, buf, got);   /* best effort, ignore errors */
