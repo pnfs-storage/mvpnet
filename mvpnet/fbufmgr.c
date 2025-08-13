@@ -216,14 +216,14 @@ done:
 }
 
 /*
- * get space for a new frame in a fbufmgr.  we establish a loan
- * for the new frame.   the caller is responsible for copying the
- * frame data in.   the active fbuf in fbufmgr must not be holding
- * a partial frame (or we'll fail).   return 0 on success,
- * return a unix errno code on failure.
+ * get space for a new frame in a fbufmgr.  we establish the given
+ * number of loans for the new frame.   the caller is responsible
+ * for copying the frame data in.   the active fbuf in fbufmgr must
+ * not be holding a partial frame (or we'll fail).
+ * return 0 on success, return a unix errno code on failure.
  */
-int fbufmgr_loan_newframe(struct fbufmgr *mgr, size_t size, void **framep,
-                         struct fbuf **fbufp) {
+int fbufmgr_loan_newframe(struct fbufmgr *mgr, size_t size, int nloan,
+                         void **framep, struct fbuf **fbufp) {
     struct fbuf *active = mgr->active;
 
     /* validate size - none of these should happen with normal usage */
@@ -242,14 +242,15 @@ int fbufmgr_loan_newframe(struct fbufmgr *mgr, size_t size, void **framep,
         return(EBUSY);
     }
 
-    fbuf_loan(active);                       /* caller must return loan */
+    fbuf_loan(active, nloan);                /* caller must return loan */
     *framep = active->fstart;
     *fbufp = active;
 
     active->rp += size;
     active->fstart = active->rp;
-    mlog(FBUF_DBG, "loan_newframe: id=%s OK active=%p, size=%zd, resid=%zd",
-         mgr->id, active, size, active->end - active->rp);
+    mlog(FBUF_DBG,
+         "loan_newframe: id=%s OK active=%p, size=%zd, nloan=%d, resid=%zd",
+         mgr->id, active, size, nloan, active->end - active->rp);
 
     if (active->end - active->rp < mgr->min_avail) {  /* below threshold? */
         fbufmgr_retire_active(mgr);
@@ -318,16 +319,19 @@ ssize_t fbufmgr_recv(struct fbufmgr *mgr, int sock,
 
 /*
  * loan out space in a fbuf.   used by fbuf_cb_t callback function
- * to place a hold on reusing the fbuf's buffer space while it is
- * being processed.
+ * to place a hold on reusing the fbm_main fbuf's buffer space while
+ * it is being processed.  also used by broadcast code to hold space
+ * in fbm_bcast until it is processed.
  */
-void fbuf_loan(struct fbuf *fbuf) {
+void fbuf_loan(struct fbuf *fbuf, int nloan) {
     struct fbufmgr *mgr = fbuf->mgr;
 
+    if (nloan < 1)
+        mlog_abort(FBUF_CRIT, "fbuf_loan: invalid nloan %d", nloan);
     pthread_mutex_lock(&mgr->lck);
-    fbuf->loancnt++;
-    mlog(FBUF_DBG, "loan: id=%s, fbuf=%p, new loancnt=%d", mgr->id,
-         fbuf, fbuf->loancnt);
+    fbuf->loancnt += nloan;
+    mlog(FBUF_DBG, "loan: id=%s, fbuf=%p, nloan=%d, new loancnt=%d", mgr->id,
+         fbuf, nloan, fbuf->loancnt);
     pthread_mutex_unlock(&mgr->lck);
 }
 

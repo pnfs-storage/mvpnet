@@ -145,6 +145,33 @@ static int fdio_binary_router(int root_rank, int world_size,
     return(2);        /* two children */
 }
 
+/*
+ * "broadcast" a frame down our broadcast tree.  the ranks of our
+ * children in in the broadcast tree are in children[].  caller
+ * should establish "nchild" loans on the fbuf _before_ calling us.
+ * we drop loans on queuing error (otherwise they will get dropped
+ * in the normal way after the MPI thread sends the data).
+ */
+static void fdio_broadcast(struct fbuf *fbuf, char *fstart, int nbytes,
+                           struct fdio_args *a, char *type,
+                           int nchild, int *children) {
+    int lcv;
+    struct sendq_entry *sqe;
+
+    for (lcv = 0 ; lcv < nchild ; lcv++) {
+        sqe = mvp_sq_queue(a->mq, children[lcv], fstart, nbytes, fbuf);
+
+        if (sqe == NULL) {
+            if (!mvp_sq_draining(a->mq))      /* null is ok if draining */
+                mlog(FDIO_CRIT, "broadcast-%s: drop %d (no space)", type, lcv);
+            fbuf_return(fbuf);  /* failed, drop the loan */
+        } else {
+            mlog(FDIO_DBG, "broadcast-%s: qok %d, dst=%d, sqe=%p, fb=%p",
+                 type, lcv, children[lcv], sqe, fbuf);
+        }
+    }
+}
+
 /* ssh probe thread main */
 static void *fdio_sshprobe(void *arg) {
     struct fdio_args *a = arg;
@@ -264,7 +291,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
         /* validate rank */
         if (dst_rank != a->mi.rank && dst_rank >= 0 &&
             dst_rank <= a->mi.wsize) {
-            fbuf_loan(fbuf);        /* establish loan */
+            fbuf_loan(fbuf, 1);     /* establish loan */
             sqe = mvp_sq_queue(a->mq, dst_rank, fstart, nbytes, fbuf);
             if (sqe == NULL) {
                 if (!mvp_sq_draining(a->mq))   /* ok if draining */
@@ -304,7 +331,7 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
              a->mi.rank, arp_qrank, fbuf);
 
         /* first allocate space for the reply in fbm_bcast */
-        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, nbytes,
+        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, nbytes, 1,
                                   &rep_fstart, &rep_fbuf) != 0) {
             mlog(FDIO_CRIT, "pqframe: bcast-ARP: no space for reply %d - drop",
                  arp_qrank);
@@ -347,20 +374,11 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
 
         a->fst.bcast_st_cnt++;
         a->fst.bcast_st_bytes += nbytes;
-        mlog(FDIO_DBG, "pqframe: bcast start from %d - routing", a->mi.rank);
         nc = fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank, children);
-
-        for (int lcv = 0 ; lcv < nc; lcv++) {
-            fbuf_loan(fbuf);                    /* establish loan */
-            sqe = mvp_sq_queue(a->mq, children[lcv], fstart, nbytes, fbuf);
-            if (sqe == NULL) {
-                if (!mvp_sq_draining(a->mq))    /* ok if draining */
-                    mlog(FDIO_CRIT, "pqframe: bcast drop: no space (%d)", lcv);
-                fbuf_return(fbuf);  /* failed, drop the loan */
-            } else {
-                mlog(FDIO_DBG, "pqframe: bcast c%d sqe=%p, fb=%p",
-                     lcv, sqe, fbuf);
-            }
+        mlog(FDIO_DBG, "pqframe: bcast start@%d: nchild=%d", a->mi.rank, nc);
+        if (nc > 0) {
+            fbuf_loan(fbuf, nc);
+            fdio_broadcast(fbuf, fstart, nbytes, a, "start", nc, children);
         }
 
         return;
@@ -653,10 +671,9 @@ static void fdio_read_dgqout(struct fdio_args *a, struct pollfd *pf,
 static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     int xtrahdrsz = (a->nettype == SOCK_STREAM) ? 4 : 0;
     uint8_t *efrm;
-    int src_rank, children[2], nchild, lcv;
+    int src_rank, children[2], nchild;
     void *copy;
     struct fbuf *copy_fbuf;
-    struct sendq_entry *sqe;
 
     curq->rqe = mvp_rq_dequeue(a->mq, &curq->pending);
 
@@ -688,8 +705,8 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     }
 
     /* compute children in bcast tree */
-    mlog(FDIO_DBG, "loadnext: bcast from rank %d - routing!", src_rank);
     nchild = fdio_binary_router(src_rank, a->mi.wsize, a->mi.rank, children);
+    mlog(FDIO_DBG, "loadnext: bcast from %d: nchild=%d", src_rank, nchild);
 
     /* send copies to any children we have */
     a->fst.bcastin_cnt++;
@@ -697,34 +714,16 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     if (nchild == 0)
         return;                          /* done, no children to forward to */
 
-    /* copy frame to fbm_bcast for forwarding */
-    if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, &copy,
-                              &copy_fbuf) != 0) {
+    /* copy frame to fbm_bcast for forwarding and broadcast it */
+    if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, nchild,
+                              &copy, &copy_fbuf) != 0) {
         mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
              src_rank);
         return;
     }
     memcpy(copy, curq->rqe->frame, curq->rqe->flen);
-    if (nchild > 1) {
-        fbuf_loan(copy_fbuf);  /* additional loan for second child */
-    }
-
-    for (lcv = 0 ; lcv < nchild ; lcv++) {
-        mlog(FDIO_DBG, "loadnext: bcast to %d loan on fb=%p", children[lcv],
-             copy_fbuf);
-
-        sqe = mvp_sq_queue(a->mq, children[lcv], copy, curq->rqe->flen,
-                           copy_fbuf);
-        if (sqe == NULL) {
-            if (!mvp_sq_draining(a->mq))      /* ok if draining */
-                mlog(FDIO_CRIT, "loadnext: bcast sqe alloc fail for %d, drop",
-                     children[lcv]);
-            fbuf_return(copy_fbuf);  /* failed, drop the loan */
-        } else {
-            mlog(FDIO_DBG, "loadnext: q bcastcopy sqe=%p, dst=%d",
-                 sqe, children[lcv]);
-        }
-    }
+    fdio_broadcast(copy_fbuf, copy, curq->rqe->flen, a, "relay",
+                   nchild, children);
 }
 
 /*
