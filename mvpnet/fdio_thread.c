@@ -320,6 +320,14 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
         struct fbuf *rep_fbuf;
         uint8_t *rep_frm;
 
+        /* shutdown broadcast?  honor (unless ignore flag set) */
+        if (arp_qrank == MVPNET_SDOWNRANK && a->ign_shutdown_ip == 0) {
+            mlog(FDIO_INFO, "pqframe: got shutdown broadcast");
+            if (mvp_notify_fdio(a->mq, FDIO_NOTE_SNDSHUT) < 0)
+                mlog(FDIO_ERR, "pqframe: shutdown trigger note failed");
+            return;  /* drop the req */
+        }
+
         if (arp_qrank < 0 || arp_qrank >= a->mi.wsize ||
             arp_qrank == a->mi.rank) {
             a->fst.arpreq_badreq++;

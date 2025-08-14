@@ -183,6 +183,7 @@ void usage(char *prog, int rank) {
             defs.defpri_ml);
     fprintf(stderr, "\t-g          have rank0 dump global stats to file\n");
     fprintf(stderr, "\t-i [img]   *image spec to load\n");
+    fprintf(stderr, "\t-I          ignore shutdown IP 10.255.255.254 msgs\n");
     fprintf(stderr, "\t-j [id]     job id/name (added to log/socket names)\n");
     fprintf(stderr, "\t-k [val]    kvm on (1) or off (0) (def=%d)\n", defs.kvm);
     fprintf(stderr, "\t-l [dir]    log file directory (def=%s)\n", defs.logdir);
@@ -270,10 +271,13 @@ int main(int argc, char **argv) {
         MPI_Comm_size(mii.comm, &mii.wsize))
         errx(1, "MPI unable to find my place in the world");
     mii.maxlocalsize = 0;   /* updated below */
+    if (mii.wsize > MVPNET_MAXWSIZE)
+        rmerror(mii.rank, 0, "wsize %d too big (max=%d)", mii.wsize,
+                MVPNET_MAXWSIZE);
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:C:d:D:ghi:j:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
+                 "B:c:C:d:D:ghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -331,6 +335,9 @@ int main(int argc, char **argv) {
                 if (strvec_append(&mopt.image, optrest, NULL) == -1)
                     rmerror(mii.rank, match, "unable to append imagename");
             }
+            break;
+        case 'I':
+            mopt.ign_shutdown_ip = 1;
             break;
         case 'j':
             mopt.jobname = optarg;
@@ -593,6 +600,8 @@ int main(int argc, char **argv) {
     /* log the config */
     mlog(MVP_NOTE, "config for rank %d:", mii.rank);
     mlog(MVP_NOTE, "tags: job=%s, rank=%s", jobtag, ranktag);
+    mlog(MVP_NOTE, "ignore-shutdown-ip: %s",
+        (mopt.ign_shutdown_ip) ? "yes" : "no");
     if (mopt.cloudinit)
         mlog(MVP_NOTE, "cloudinit: %s", mopt.cloudinit);
     if (mopt.conlog)
@@ -651,6 +660,7 @@ int main(int argc, char **argv) {
     /* setup fdio args */
     fdioargs.qvec = &qemuvec;
     fdioargs.mi = mii;     /* struct copy */
+    fdioargs.ign_shutdown_ip = mopt.ign_shutdown_ip;
     fdioargs.localsshport = localport;
     fdioargs.sshprobe_timeout = mopt.sshprobe_timeout;
     fdioargs.nettype = mopt.nettype;

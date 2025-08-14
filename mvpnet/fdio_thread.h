@@ -96,6 +96,7 @@ struct fdio_args {
     /* config data that is constant throughout the life of fdio_thread */
     struct strvec *qvec;     /* qemu command line for exec */
     struct mpiinfo mi;       /* copy of mpi info for this proc */
+    int ign_shutdown_ip;     /* ignore shutdown IP */
     int localsshport;        /* local port to reach guest sshd on */
     int sshprobe_timeout;    /* timeout for ssh probe (secs) */
     int nettype;             /* network type (SOCK_STREAM or SOCK_DGRAM) */

@@ -42,6 +42,15 @@
 #include "utilfns.h"       /* for strvec */
 
 /*
+ * max worldsize we can handle given our net 10 to MPI rank mapping scheme.
+ * in a net 10 address we have 3 bytes that we can encode the MPI rank in.
+ * we block 3 IPs: 10.0.0.0 (old broadcast), 10.225.225.255 (broadcast),
+ * and 10.255.255.254 (shutdown trigger).
+ */
+#define MVPNET_MAXWSIZE    0x00fffffd    /* 16777213 or 2^24-3 */
+#define MVPNET_SDOWNRANK   0x00fffffd    /* shutdown rank (10.255.255.254) */
+
+/*
  * structure to store mvpnet command line options
  */
 struct mvpopts {
@@ -52,6 +61,7 @@ struct mvpopts {
     struct strvec domain;  /* domain(s) for resolver */
     int gstats;            /* do global stat dump at rank 0 */
     struct strvec image;   /* images to load */
+    int ign_shutdown_ip;   /* ignore msgs to shutdown IP (10.255.255.254) */
     char *jobname;         /* batch job name/id (if any) */
     int kvm;               /* use kvm when running qemu */
     char *logdir;          /* directory put log files */
