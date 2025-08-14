@@ -514,8 +514,10 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
                                     int *qstdinp) {
     char buf;
     ssize_t got;
-    int ret;
+    int ret, nchild, children[2], ndraining;
     struct sockaddr_un sun;
+    void *sbc_pkt;             /* shutdown broadcast pkg buffer */
+    struct fbuf *sbc_fbuf;
 
     got = read(pf->fd, &buf, sizeof(buf));   /* get the note */
     if (got != 1) {
@@ -586,6 +588,42 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
             close(*qstdinp);
             *qstdinp = -1;
         }
+        break;
+    case FDIO_NOTE_SNDSHUT:
+        if (a->mi.rank != 0) {
+            mlog(FDIO_WARN, "readnote: SNDSHUT ignored (rank=%d)", a->mi.rank);
+            break;
+        }
+        if (mvp_sq_draining(a->mq)) {
+            mlog(FDIO_WARN, "readnote: SNDSHUT ignored (is draining)");
+            break;
+        }
+
+        /* broadcast shutdown packet if needed */
+        nchild = fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank,
+                                    children);
+
+        if (nchild > 0) {
+            if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, PKTFMT_SHUTDOWN_LEN,
+                                      nchild, &sbc_pkt, &sbc_fbuf) != 0) {
+                /* we can still shutdown, but we cannot relay the msg */
+                mlog(FDIO_CRIT, "readnote: SNDSHUT no bcast buffer space!");
+            } else {
+                pktfmt_load_shutdown(sbc_pkt); /* len PKTFMT_SHUTDOWN_LEN */
+                fdio_broadcast(sbc_fbuf, sbc_pkt, PKTFMT_SHUTDOWN_LEN,
+                               a, "shutdown", nchild, children);
+            }
+        }
+
+        /* start draindown (if not already running) */
+        ndraining = mvp_sq_draindown(a->mq);
+        if (ndraining == 0 && *qstdinp >= 0) {   /* close qemu stdin now */
+            close(*qstdinp);
+            *qstdinp = -1;
+        }
+        mlog(FDIO_DBG, "readnote: SNDSHUT relay (nchild=%d, draining=%d)",
+             nchild, ndraining);
+
         break;
     default:
         mlog_exit(1, FDIO_CRIT, "readnote: unknown note %d!", buf);
@@ -668,10 +706,11 @@ static void fdio_read_dgqout(struct fdio_args *a, struct pollfd *pf,
  * we will start writing it to the qemu socket) and also handle
  * any broadcast-related processing.
  */
-static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
+static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq,
+                               int *qstdinp) {
     int xtrahdrsz = (a->nettype == SOCK_STREAM) ? 4 : 0;
     uint8_t *efrm;
-    int src_rank, children[2], nchild;
+    int src_rank, children[2], nchild, ndraining;
     void *copy;
     struct fbuf *copy_fbuf;
 
@@ -711,19 +750,30 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq) {
     /* send copies to any children we have */
     a->fst.bcastin_cnt++;
     a->fst.bcastin_bytes += curq->rqe->flen;
-    if (nchild == 0)
-        return;                          /* done, no children to forward to */
 
-    /* copy frame to fbm_bcast for forwarding and broadcast it */
-    if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, nchild,
-                              &copy, &copy_fbuf) != 0) {
-        mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
-             src_rank);
-        return;
+    /* if we have children in bcast tree: copy to fbm_bcast and forward */
+    if (nchild > 0) {
+        if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, curq->rqe->flen, nchild,
+                                  &copy, &copy_fbuf) != 0) {
+            mlog(FDIO_CRIT, "loadnext: bcast from %d, newframe failed, drop",
+                 src_rank);
+            return;
+        }
+        memcpy(copy, curq->rqe->frame, curq->rqe->flen);
+        fdio_broadcast(copy_fbuf, copy, curq->rqe->flen, a, "relay",
+                       nchild, children);
     }
-    memcpy(copy, curq->rqe->frame, curq->rqe->flen);
-    fdio_broadcast(copy_fbuf, copy, curq->rqe->flen, a, "relay",
-                   nchild, children);
+
+    /* check for and handle shudown frames */
+    if (pktfmt_is_shutdown(efrm, curq->rqe->flen)) {
+        fdio_qemusend_done(a, curq);  /* drop, no need to send to qemu */
+        ndraining = mvp_sq_draindown(a->mq);
+        if (ndraining == 0 && qstdinp >= 0) {
+            close(*qstdinp);
+            *qstdinp = -1;
+        }
+        mlog(FDIO_NOTE, "loadnext: recv shutdown (ndraining=%d)", ndraining);
+    }
 }
 
 /*
@@ -978,7 +1028,8 @@ void *fdio_main(void *arg) {
             /* load a new rqe if none is currently active */
             if (cur_qsend.rqe == NULL) {
 
-                fdio_load_next_rqe(a, &cur_qsend); /* reload cur_qsend.rqe */
+                /* reload cur_qsend.rqe */
+                fdio_load_next_rqe(a, &cur_qsend, &qemu_stdin);
 
             }
 

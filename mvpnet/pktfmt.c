@@ -141,3 +141,31 @@ void pktfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep) {
     memcpy(&rep[ARP_THW_OFF], &req[ARP_SHW_OFF], ETH_ADDRSIZE);
     memcpy(&rep[ARP_TIP_OFF], &req[ARP_SIP_OFF], IP_ADDRSZ);
 }
+
+/*
+ * shutdown broadcast packet
+ */
+static uint8_t shutdown_pkt[PKTFMT_SHUTDOWN_LEN] = {
+     0xff, 0xff, 0xff, 0xff, 0xff, 0xff,    /* ETH_DST: broadcast */
+     0x52, 0x55, 0x00, 0x00, 0x00, 0x00,    /* ETH_SRC: rank 0 */
+     0x08, 0x88,                            /* ETH_TYPE: reuse old xyplex# */
+     'm', 'v', 'p', 'n', 'e', 't', 0        /* magic string, zero fill rest */
+};
+
+/*
+ * is the given frame the shutdown packet?   ret 1 if true, 0 ow.
+ */
+int pktfmt_is_shutdown(uint8_t *ef, int efsz) {
+    if (efsz != PKTFMT_SHUTDOWN_LEN ||
+        memcmp(ef, shutdown_pkt, PKTFMT_SHUTDOWN_LEN) != 0)
+        return(0);
+    return(1);
+}
+
+/*
+ * load shutdown packet into frame.   caller must ensure ef is
+ * the correct size (PKTFMT_SHUTDOWN_LEN).
+ */
+void pktfmt_load_shutdown(uint8_t *ef) {
+    memcpy(ef, shutdown_pkt, PKTFMT_SHUTDOWN_LEN);
+}

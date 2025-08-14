@@ -61,6 +61,7 @@
 #define FDIO_NOTE_NOSSHD  3  /* sshd failed to start before timeout */
 #define FDIO_NOTE_QUEUE   4  /* check MPI queue for input data */
 #define FDIO_NOTE_DRAINED 5  /* mpisendq drain complete */
+#define FDIO_NOTE_SNDSHUT 6  /* send shutdown bcast pkt; start shutdown */
 
 /*
  * stats collected by fdio thread

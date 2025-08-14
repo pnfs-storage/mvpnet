@@ -47,7 +47,12 @@
 #define ETH_TYPEOFF  (ETH_ADDRSIZE*2)    /* ethernet frame type offset */
 #define ETH_DATAOFF  (ETH_TYPEOFF+2)     /* data offset */
 
+#define PKTFMT_SHUTDOWN_LEN  68          /* length of shutdown bcast pkt */
+
 int pktfmt_arp_req_qrank(uint8_t *ef, int efsz, int *qrankp);
 void pktfmt_arp_mkreply(uint8_t *req, int qrank, uint8_t *rep);
+
+int pktfmt_is_shutdown(uint8_t *ef, int efsz);
+void pktfmt_load_shutdown(uint8_t *ef);
 
 #endif /* MVP_PKTFMT_H */
