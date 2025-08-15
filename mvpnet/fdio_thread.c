@@ -376,8 +376,21 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
      * broadcast-like operation with our rank as the root.  use the
      * binary router to determine the next hops in the binary broadcast
      * tree and send the data there.  we will have 0, 1, or 2 next hops.
+     *
+     * if qemu is trying to directly send a shutdown broadcast, route
+     * it through FDIO_NOTE_SNDSHUT instead of sending it here.  this
+     * unifies shutdown broadcast handling in one central place where
+     * we have everything we need to process it (e.g. qemu_stdin).
      */
-    {
+    if (pktfmt_is_shutdown(efrm, nbytes - xtrahdrsz) != 0) {
+
+        if (mvp_notify_fdio(a->mq, FDIO_NOTE_SNDSHUT) < 0)
+            mlog(FDIO_CRIT, "pqframe: broadcast shutdown notify failed!");
+        else
+            mlog(FDIO_NOTE, "pqframe: broadcast shutdown trigger from qemu!");
+
+    } else {
+
         int nc, children[2];       /* in broadcast tree */
 
         a->fst.bcast_st_cnt++;
