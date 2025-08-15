@@ -465,7 +465,7 @@ int mvp_queuing_init(struct mvp_queuing *mq) {
 
     /* make it safe to call finalize on mq (if we get an error) */
     memset(mq, 0, sizeof(*mq));
-    mq->fdio_notify[0] = mq->fdio_notify[1] = -1;
+    mq->fdio_notify[NOTE_RD] = mq->fdio_notify[NOTE_WR] = -1;
     pthread_mutex_init(&mq->qlock, NULL);
     TAILQ_INIT(&mq->mpisendq);
     TAILQ_INIT(&mq->mpisndfree);
@@ -531,10 +531,10 @@ void mvp_queuing_finalize(struct mvp_queuing *mq) {
     struct recvq_entry *rqe;
 
     /* close notification fds */
-    if (mq->fdio_notify[0] != -1)
-        close(mq->fdio_notify[0]);
-    if (mq->fdio_notify[1] != -1)
-        close(mq->fdio_notify[1]);
+    if (mq->fdio_notify[NOTE_RD] != -1)
+        close(mq->fdio_notify[NOTE_RD]);
+    if (mq->fdio_notify[NOTE_WR] != -1)
+        close(mq->fdio_notify[NOTE_WR]);
 
     /* drop/free sqes waiting for isend, then clear the free list */
     while ((sqe = TAILQ_FIRST(&mq->mpisendq)) != NULL) {

@@ -65,9 +65,12 @@
 struct mvpnet_global {
     pid_t mainpid;       /* pid of main process */
     struct strvec tmps;  /* temporary files to remove at exit */
+    int *fdio_notify_wr; /* pointer to pipe fd to write notifications on */
 };
 
-struct mvpnet_global g = { .mainpid = -1, .tmps = STRVEC_INIT };
+struct mvpnet_global g = {
+    .mainpid = -1, .tmps = STRVEC_INIT, .fdio_notify_wr = NULL,
+};
 
 /*
  * atexit handler
@@ -94,6 +97,22 @@ static void atexit_handler() {
     }                                                                          \
     exit(1);                                                                   \
 } while (0)
+
+/*
+ * sigusr1_handler is a trigger that attempts to post FDIO_NOTE_SNDSHUT
+ * to fdio_thread when we get SIGUSR1.   we have to expose the write side
+ * fd of the pipe in the global data structure so that the signal handler
+ * can access it.   note that we write directly to the pipe rather than
+ * calling mvp_notify_fdio() in order to minimize what we are doing in
+ * a signal handler (e.g. we avoid calling mlog()).
+ */
+static void sigusr1_handler(int arg) {
+    char note = FDIO_NOTE_SNDSHUT;
+    if (g.fdio_notify_wr) {
+        if (write(*g.fdio_notify_wr, &note, sizeof(note)) != sizeof(note))
+            g.fdio_notify_wr = NULL;    /* kill ptr on error */
+    }
+}
 
 /*
  * is local tcp port currently available for qemu sshd forwarding?
@@ -656,6 +675,10 @@ int main(int argc, char **argv) {
     /* init mvp_queuing subsystem */
     if (mvp_queuing_init(&mvpq) != 0)
         mlog_exit(1, MVP_CRIT, "mvp_queuing_init failed");
+
+    /* need to expose note_wr fd in global space for signal handler */
+    g.fdio_notify_wr = &mvpq.fdio_notify[NOTE_WR];
+    signal(SIGUSR1, sigusr1_handler);
 
     /* setup fdio args */
     fdioargs.qvec = &qemuvec;
