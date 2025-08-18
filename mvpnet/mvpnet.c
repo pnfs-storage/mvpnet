@@ -181,6 +181,33 @@ static int stringcheck(char *in, int xtra) {
 }
 
 /*
+ * setup environment variables for any children we create.  they
+ * can also be examined by debugging tools for diagnostic purposes.
+ * ret 0 if ok, -1 on error (out of memory?).
+ */
+static int mvp_setenv(struct mvpopts *moptp, struct mpiinfo *miip,
+                      int locprt) {
+    char scratch[32];
+
+    snprintf(scratch, sizeof(scratch), "%d", locprt);
+    if (setenv("MVPNET_SSHPORT", scratch, 1) != 0)
+        return(-1);
+    if (moptp->username && setenv("MVPNET_SSHUSER", moptp->username, 1) != 0)
+        return(-1);
+    snprintf(scratch, sizeof(scratch), "%d", miip->rank);
+    if (setenv("MVPNET_RANK", scratch, 1) != 0)
+        return(-1);
+    snprintf(scratch, sizeof(scratch), "%d", miip->wsize);
+    if (setenv("MVPNET_WSIZE", scratch, 1) != 0)
+        return(-1);
+    if (moptp->jobname && setenv("MVPNET_JOBNAME", moptp->jobname, 1) != 0)
+        return(-1);
+    if (setenv("MVPNET_LOGDIR", moptp->logdir, 1) != 0)
+        return(-1);
+    return(0);
+}
+
+/*
  * callback function for fdforkprog().  the intent is to close
  * mlog file descriptors after the fork but before the exec (so
  * we don't leak into the new program).
@@ -614,6 +641,10 @@ int main(int argc, char **argv) {
     if (localport > UINT16_MAX)
         mlog_exit(1, MVP_ERR, "no local ports (wsize=%d, stride=%d)",
                   mii.wsize, stride);
+
+    /* set environment variables now that we have localport */
+    if (mvp_setenv(&mopt, &mii, localport) < 0)
+        errx(1, "unable to set environment variables");
 
     /* now we can build our qemu command line */
     qcliargs.mopt = &mopt;
