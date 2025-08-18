@@ -181,6 +181,15 @@ static int stringcheck(char *in, int xtra) {
 }
 
 /*
+ * callback function for fdforkprog().  the intent is to close
+ * mlog file descriptors after the fork but before the exec (so
+ * we don't leak into the new program).
+ */
+void mvp_closelog(void *unused) {
+    mlog_close();
+}
+
+/*
  * usage msg
  */
 void usage(char *prog, int rank) {

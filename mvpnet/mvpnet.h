@@ -105,4 +105,7 @@ struct mpiinfo {
     MPI_Comm comm;           /* our top-level comm */
 };
 
+/* callback function for fdforkprog() */
+void mvp_closelog(void *unused);
+
 #endif /* MVP_MVPNET_H */

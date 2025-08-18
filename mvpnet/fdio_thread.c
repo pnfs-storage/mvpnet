@@ -931,7 +931,8 @@ void *fdio_main(void *arg) {
 
     /* now we can finally start qemu! */
     qemupid = fdforkprog(a->qvec->base[0], a->qvec->base, FDFPROG_FIOD,
-                         &qemu_stdin, &pfd[PF_QEMUOUT].fd, NULL);
+                         &qemu_stdin, &pfd[PF_QEMUOUT].fd, NULL,
+                         mvp_closelog, NULL);
     if (qemupid < 0) {
         mlog(FDIO_CRIT, "main: qemu fdforkprog failed!");
         final_state = FDIO_ERROR;

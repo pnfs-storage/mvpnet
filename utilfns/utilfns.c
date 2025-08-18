@@ -194,7 +194,8 @@ int mksock_un(int type, const char *path) {
  * failure.
  */
 pid_t fdforkprog(const char *prog, char *const argv[], int flags,
-                 int *stdinfd, int *stdoutfd, int *stderrfd) {
+                 int *stdinfd, int *stdoutfd, int *stderrfd,
+                 fdforkprog_cb fdf_cb, void *cbarg) {
     int lcv, pipefds[7];   /* [0,1]=in, [2,3]=out, [4,5]=err, 6=xtra err */
     char *emsg;
     pid_t child;
@@ -291,6 +292,10 @@ pid_t fdforkprog(const char *prog, char *const argv[], int flags,
      * the child can now finish the I/O setup and exec the requested program.
      */
     if (child == 0) {
+
+        if (fdf_cb != NULL) {        /* do user callback fn, if provided */
+            (fdf_cb)(cbarg);            /* cb is allowed to exit on failure */
+        }
 
         if (flags & FDFPROG_FIN) {   /* changing stdin? */
             if (stdinfd) {

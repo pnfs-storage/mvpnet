@@ -50,6 +50,9 @@
 #define FDFPROG_FIOE    7       /* short for FIN|FOUT|FERR */
 #define FDFPROG_FIOD    11      /* short for FIN|FOUT|FEDUPOUT */
 
+/* optional fdforkprog callback function pointer */
+typedef void (*fdforkprog_cb)(void *arg);
+
 /*
  * strvec: null terminated vector of strings (e.g. for use with exec*()).
  * the vector array base[], the length array lens[], and each string
@@ -88,7 +91,8 @@ int copyfile(char *from, char *to, int flags);
 int dirok(char *dir);
 int fdcloexec(int fd, int state);
 pid_t fdforkprog(const char *prog, char *const argv[], int flags,
-                 int *stdinfd, int *stdoutfd, int *stderrfd);
+                 int *stdinfd, int *stdoutfd, int *stderrfd,
+                 fdforkprog_cb fdf_cb, void *cbarg);
 int fdreadreset(int select_rv, fd_set *fds, int fd);
 char *loadfile(char *file, off_t *szp);
 FILE *logfopen(const char *path, const char *mode);
