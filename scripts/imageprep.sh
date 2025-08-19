@@ -1,6 +1,9 @@
 #!/bin/sh
-# imageprep  a one-time sequence of task's to perform on a disk image
-# before or during initial VM instantiation
+# imageprep  a one-time sequence of tasks to perform on a disk image
+# before or very early during initial VM instantiation
+#
+# for tasks that can/should happen later during cloud-init instantiation,
+# see scripts/late.sh
 #
 # 2025-07-28  crd@andrew.cmu.edu
 #

@@ -61,6 +61,10 @@ ${SSH_AUTHORIZED_KEYS}
   sudo: 'ALL=(ALL) NOPASSWD:ALL'
 # this appears to be necessary when hostname is set by systemd?
 create_hostname_file: false
+# there are certain things that need to happen after all of the other
+# cloud-init stuff has finished.  run those from this script.
+runcmd:
+  - [ cloud-init-per, once, late, sh, -c, '/mnt/late.sh' ]
 EOF
 
 cat > ${seed_dir}/meta-data << EOF || die "couldn't create meta-data file"
@@ -68,10 +72,20 @@ instance-id: iid-local01
 dsmode: local
 EOF
 
+# copy the other scripts that we need
+for f in imageprep.sh mvpnet-init.sh proxy-config.sh install-packages.sh late.sh; do
+  cp $(dirname ${0})/${f} ${seed_dir} || die "couldn't copy ${f} script to seed dir"
+  chmod 755 ${seed_dir}/${f}
+done
+
+# rename since we're selecting the shell version
+mv ${seed_dir}/mvpnet-init.sh ${seed_dir}/mvpnet-init
+
 echo
 echo "prep-config finished!"
 echo
 echo "place any other scripts or data that you want to be available"
 echo "to the guest into ${seed_dir} before starting mvpnet."
+echo
 
 exit 0
