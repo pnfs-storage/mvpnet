@@ -331,9 +331,17 @@ int main(int argc, char **argv) {
         rmerror(mii.rank, 0, "wsize %d too big (max=%d)", mii.wsize,
                 MVPNET_MAXWSIZE);
 
-    /* parse our command line options */
+    /*
+     * parse our command line options
+     *
+     * XXX: need '+' in optstring with glibc so that it does not permute
+     * the args.   we want to stop parsing opts when we hit a non-option
+     * so that we can pass the rest to the app-script process as its
+     * command line.  the '+' should be harmless on non-glibc getopts.
+     * see discussion of POSIXLY_CORRECT in glib getopt man page.
+     */
     while ((ch = getopt(argc, argv,
-            "B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
+            "+B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -537,9 +545,6 @@ int main(int argc, char **argv) {
     argc -= optind;
     argv += optind;
 
-    if (argc != 1)
-        usage(prog, mii.rank);
-
     if (mopt.image.nused == 0)
         rmerror(mii.rank, 1, "images must be specified with -i");
     if (cmdpathok(mopt.monwrap) < 0)
@@ -682,6 +687,16 @@ int main(int argc, char **argv) {
         mlog(MVP_NOTE, "EOF-on-stdin: ignored");
     mlog(MVP_NOTE, "localport: %d", localport);
     mlog(MVP_NOTE, "sshprobe_timeout: %d", mopt.sshprobe_timeout);
+    if (mii.rank == 0) {
+        if (argc == 0) {
+            mlog(MVP_NOTE, "app-command: <none>");
+        } else {
+            mlog(MVP_NOTE, "app-command:");
+            for (lcv = 0 ; lcv < argc ; lcv++) {
+                mlog(MVP_NOTE, "appcmd[%d]: %s", lcv, argv[lcv]);
+            }
+        }
+    }
     if (qemuvec.base == NULL) {
         mlog(MVP_NOTE, "qemuvec: <null>");
     } else {
@@ -739,8 +754,9 @@ int main(int argc, char **argv) {
     fdioargs.socknames = socknames;
     fdioargs.sockfds = sockfds;
     fdioargs.confp = conlog_fp;
+    fdioargs.app_argc = argc;
+    fdioargs.app_argv = argv;
     fdioargs.mq = &mvpq;
-    /* XXXCDC: anything else we need to pass to it?  app script? */
 
     /*
      * barrier here to ensure that any copyfile() calls in qemucli_gen()

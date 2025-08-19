@@ -104,6 +104,8 @@ struct fdio_args {
     char **socknames;        /* unix domain socket filenames */
     int *sockfds;            /* socket file descriptors */
     FILE *confp;             /* if not NULL, print console output here */
+    int app_argc;            /* argc for app script */
+    char **app_argv;         /* argv for app script */
 
     /* mvp queuing area (w/notify pipe) ... shared with MPI thread */
     struct mvp_queuing *mq;  /* see mvp_queuing for locking info */
@@ -115,9 +117,6 @@ struct fdio_args {
 
     /* fdio stats - only fdio thread writes here */
     struct fdio_stats fst;   /* fdio stats */
-#if 0
-    // need user application script name
-#endif
 };
 
 /* non-NULL defaults for fdio_args */
