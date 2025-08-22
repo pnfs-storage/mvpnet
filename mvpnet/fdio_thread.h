@@ -99,6 +99,7 @@ struct fdio_args {
     int ign_shutdown_ip;     /* ignore shutdown IP */
     int localsshport;        /* local port to reach guest sshd on */
     int sshprobe_timeout;    /* timeout for ssh probe (secs) */
+    int eof_in_shutdown;     /* shutdown if we get EOF on stdin */
     int nettype;             /* network type (SOCK_STREAM or SOCK_DGRAM) */
     char **socknames;        /* unix domain socket filenames */
     int *sockfds;            /* socket file descriptors */

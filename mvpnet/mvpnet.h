@@ -59,6 +59,7 @@ struct mvpopts {
     int conlog;            /* enable console log file? */
     char *defpri_ml;       /* default mlog priority */
     struct strvec domain;  /* domain(s) for resolver */
+    int eof_in_shutdown;   /* shutdown if we get EOF on stdin */
     int gstats;            /* do global stat dump at rank 0 */
     struct strvec image;   /* images to load */
     int ign_shutdown_ip;   /* ignore msgs to shutdown IP (10.255.255.254) */

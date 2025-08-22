@@ -472,13 +472,15 @@ static size_t fdio_fbdgram_cb(struct fbuf *fbuf, char *fstart,
 
 /*
  * PF_STDIN is readable.  this indicates our process has data on stdin
- * (typically from MPI).  if we get EOF on stdin we shut down.
- * if we get data on stdin, we make a best effort to relay it to
- * qemu stdin (the console input).   we don't expect much (if any)
- * data on this path.  we ignore errors writing to qemu (note
+ * (typically from MPI).  if we get data on stdin, we make a best effort
+ * to relay it to qemu stdin (the console input).   we don't expect much
+ * (if any) data on this path.  we ignore errors writing to qemu (note
  * that qemu stdin is set to O_NONBLOCK as we don't want to block
  * writing it it).   if qemu has exited, we'll handle that later
- * as an EOF on qemu console output.
+ * as an EOF on qemu console output.  if we get EOF on stdin and the
+ * eof_in_shutdown option is set, then we shutdown.  otherwise if we
+ * get EOF on stdin and the eof_in_shutdown option is NOT set, then we
+ * start ignoring stdin.
  */
 static void fdio_read_stdin(struct fdio_args *a, struct pollfd *pf,
                             int *finalstate, int qstdin) {
@@ -486,16 +488,31 @@ static void fdio_read_stdin(struct fdio_args *a, struct pollfd *pf,
     ssize_t got;
 
     got = read(pf->fd, buf, sizeof(buf));
-    if (got < 1) {
-        mlog(FDIO_DBG, "stdin: read rv=%zd, set DONE", got);
-        *finalstate = FDIO_DONE;         /* EOF/error: exit poll loop */
+
+    if (got > 0) {
+        if (qstdin >= 0) {                 /* only relay if qstdin is open */
+            a->fst.stdin_cnt++;
+            a->fst.stdin_bytes += got;
+            got = write(qstdin, buf, got); /* best effort, ignore errors */
+        }
         return;
     }
-    if (qstdin >= 0) {                   /* only relay if qstdin is open */
-        a->fst.stdin_cnt++;
-        a->fst.stdin_bytes += got;
-        got = write(qstdin, buf, got);   /* best effort, ignore errors */
+
+    if (got == 0) {                        /* EOF */
+        if (a->eof_in_shutdown) {
+            mlog(FDIO_DBG, "stdin: got EOF, advance to DONE state");
+            *finalstate = FDIO_DONE;       /* exit poll loop */
+        } else {
+            mlog(FDIO_DBG, "stdin: got EOF, start ignoring stdin");
+            pf->fd = -1;
+            pf->events = 0;                /* to be safe */
+        }
+        return;
     }
+
+    mlog(FDIO_CRIT, "stdin: read ERROR: %s", strerror(errno));
+    *finalstate = FDIO_ERROR;        /* unlikely.  exit fdio */
+    return;
 }
 
 /*

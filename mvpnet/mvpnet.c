@@ -236,6 +236,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-d [dom]    domain (def=load from resolv.conf)\n");
     fprintf(stderr, "\t-D [pri]   *mlog default priority (def=%s)\n",
             defs.defpri_ml);
+    fprintf(stderr, "\t-E          shutdown if we get EOF on stdin\n");
     fprintf(stderr, "\t-g          have rank0 dump global stats to file\n");
     fprintf(stderr, "\t-i [img]   *image spec to load\n");
     fprintf(stderr, "\t-I          ignore shutdown IP 10.255.255.254 msgs\n");
@@ -332,7 +333,7 @@ int main(int argc, char **argv) {
 
     /* parse our command line options */
     while ((ch = getopt(argc, argv,
-                 "B:c:C:d:D:ghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
+            "B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -380,6 +381,9 @@ int main(int argc, char **argv) {
                     rmerror(mii.rank, match, "bad def priority %s", optrest);
                 mopt.defpri_ml = optrest;
             }
+            break;
+        case 'E':
+            mopt.eof_in_shutdown = 1;
             break;
         case 'g':
             mopt.gstats = 1;
@@ -672,6 +676,10 @@ int main(int argc, char **argv) {
         mlog(MVP_NOTE, "socknames[1]: %s", socknames[1]);
     if (mopt.rundir)
         mlog(MVP_NOTE, "rundir: %s", mopt.rundir);
+    if (mopt.eof_in_shutdown)
+        mlog(MVP_NOTE, "EOF-on-stdin: triggers shutdown");
+    else
+        mlog(MVP_NOTE, "EOF-on-stdin: ignored");
     mlog(MVP_NOTE, "localport: %d", localport);
     mlog(MVP_NOTE, "sshprobe_timeout: %d", mopt.sshprobe_timeout);
     if (qemuvec.base == NULL) {
@@ -726,6 +734,7 @@ int main(int argc, char **argv) {
     fdioargs.ign_shutdown_ip = mopt.ign_shutdown_ip;
     fdioargs.localsshport = localport;
     fdioargs.sshprobe_timeout = mopt.sshprobe_timeout;
+    fdioargs.eof_in_shutdown = mopt.eof_in_shutdown;
     fdioargs.nettype = mopt.nettype;
     fdioargs.socknames = socknames;
     fdioargs.sockfds = sockfds;
