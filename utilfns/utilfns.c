@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <sys/socket.h>
@@ -399,6 +400,48 @@ error:
         }
     }
     return(-1);
+}
+
+/*
+ * wait for an exiting pid to finish its exit and return a wait
+ * status.  the caller should have already asked the pid to exit
+ * (e.g. by sending it an EOF by closing its stdin or by sending
+ * it a signal).   if the pid does not exit in the number of seconds
+ * specified we will send it a SIGKILL to ensure it is no longer
+ * running.  we avoid using ITIMER_REAL/SIGALRM so this should be
+ * ok in a threaded environment (e.g. vs twaitpid()).
+ * return 0 on a successful wait, otherwise -1.
+ */
+int tfinishpid(pid_t pid, int *wstatus, int waitsecs) {
+    int phase, remaining[2], left, rv;
+    struct timespec ts;
+
+    if (wstatus)
+        *wstatus = 0;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 100000000;            /* 1/10th of a second */
+
+    remaining[0] = (waitsecs > 0) ? waitsecs * 10 : 1; /* before SIGKILL */
+    remaining[1] = 10;                                 /* after SIGKILL, 1s */
+
+    for (phase = 0 ; phase < 2 ; phase++) {
+        for (left = remaining[phase] ; left > 0 ; left--) {
+
+            rv = waitpid(pid, wstatus, WNOHANG);
+
+            if (rv == pid)
+                return(0);
+
+            if (rv == -1 && errno != EINTR)
+                return(rv);
+
+            nanosleep(&ts, NULL);
+        }
+
+        kill(pid, SIGKILL);
+    }
+
+    return(-1);                        /* SIGKILL should prevent this */
 }
 
 /*

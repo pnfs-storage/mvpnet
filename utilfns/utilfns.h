@@ -107,6 +107,7 @@ int strvec_append(struct strvec *sv, ...);
 char *strvec_flatten(struct strvec *sv, char *prefix, char *sep,
                      char *suffix);
 void strvec_free(struct strvec *sv);
+int tfinishpid(pid_t pid, int *wstatus, int waitsecs);
 int twaitpid(struct timeval *tvwait, int pidspec, int *status);
 int vec_search(char *target, int targterm, char **sarray);
 
