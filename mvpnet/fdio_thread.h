@@ -62,6 +62,7 @@
 #define FDIO_NOTE_QUEUE   4  /* check MPI queue for input data */
 #define FDIO_NOTE_DRAINED 5  /* mpisendq drain complete */
 #define FDIO_NOTE_SNDSHUT 6  /* send shutdown bcast pkt; start shutdown */
+#define FDIO_NOTE_APPTRIG 7  /* trigger running the app */
 
 /*
  * stats collected by fdio thread
@@ -82,6 +83,8 @@ struct fdio_stats {
     uint64_t stdin_bytes;    /* number of bytes we got on stdin */
     int console_cnt;         /* number of times we got qemu console output */
     uint64_t console_bytes;  /* number of qemu console bytes we got */
+    int appout_cnt;          /* number of times we got app prog output */
+    uint64_t appout_bytes;   /* number of app output bytes we got */
     int notequeue_cnt;       /* number of QUEUE notes we got */
     int accept_cnt;          /* number of accepts we processed */
     int bcastin_cnt;         /* number of bcasts we received from MPI */
@@ -104,6 +107,7 @@ struct fdio_args {
     char **socknames;        /* unix domain socket filenames */
     int *sockfds;            /* socket file descriptors */
     FILE *confp;             /* if not NULL, print console output here */
+    int out_appout;          /* print app output to stdout */
     int app_argc;            /* argc for app script */
     char **app_argv;         /* argv for app script */
 

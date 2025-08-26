@@ -226,7 +226,7 @@ void usage(char *prog, int rank) {
     if (rank != 0)
         exit(1);
 
-    fprintf(stderr, "usage: %s [flags] application-script\n", prog);
+    fprintf(stderr, "usage: %s [flags] application-prog [app-flags]\n", prog);
     fprintf(stderr, "flags are:\n");
     fprintf(stderr, "\t-B [sz]    *mlog msgbuf size (bytes, def=%d)\n",
             defs.bufsz_ml);
@@ -250,6 +250,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-M [wrap]   monwrap prog name (def=%s)\n", defs.monwrap);
     fprintf(stderr, "\t-n [nett]   net type (stream or dgram) (def=%s)\n",
             (defs.nettype == SOCK_STREAM) ? "stream" : "dgram");
+    fprintf(stderr, "\t-O          print app output to mvpnet stdout\n");
     fprintf(stderr, "\t-p [proc]  *qemu cpu type (def=%s)\n", defs.processor);
     fprintf(stderr, "\t-q [qemu]   qemu command (def=%s)\n", defs.qemucmd);
     fprintf(stderr, "\t-r [dir]    run dir to copy image to (def=none)\n");
@@ -330,6 +331,8 @@ int main(int argc, char **argv) {
     if (mii.wsize > MVPNET_MAXWSIZE)
         rmerror(mii.rank, 0, "wsize %d too big (max=%d)", mii.wsize,
                 MVPNET_MAXWSIZE);
+    if (argc == 1)
+        usage(prog, mii.rank);
 
     /*
      * parse our command line options
@@ -341,7 +344,7 @@ int main(int argc, char **argv) {
      * see discussion of POSIXLY_CORRECT in glib getopt man page.
      */
     while ((ch = getopt(argc, argv,
-            "+B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:p:q:r:s:S:t:T:u:w:X:")) != -1) {
+            "+B:c:C:d:D:ghi:Ij:k:l:L:m:M:n:Op:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -463,6 +466,9 @@ int main(int argc, char **argv) {
                 rmerror(mii.rank, 0, "bad nettype: %s (stream or dgram)",
                         optarg);
             }
+            break;
+       case 'O':
+            mopt.out_appout = 1;
             break;
        case 'p':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -691,6 +697,8 @@ int main(int argc, char **argv) {
         if (argc == 0) {
             mlog(MVP_NOTE, "app-command: <none>");
         } else {
+            mlog(MVP_NOTE, "app-output-out: %s",
+                 (mopt.out_appout) ? "yes" : "no");
             mlog(MVP_NOTE, "app-command:");
             for (lcv = 0 ; lcv < argc ; lcv++) {
                 mlog(MVP_NOTE, "appcmd[%d]: %s", lcv, argv[lcv]);
@@ -754,6 +762,7 @@ int main(int argc, char **argv) {
     fdioargs.socknames = socknames;
     fdioargs.sockfds = sockfds;
     fdioargs.confp = conlog_fp;
+    fdioargs.out_appout = mopt.out_appout;
     fdioargs.app_argc = argc;
     fdioargs.app_argv = argv;
     fdioargs.mq = &mvpq;

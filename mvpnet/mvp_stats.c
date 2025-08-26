@@ -113,8 +113,10 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
     mlog(FDIO_INFO, "bcast-start (cnt/bytes): %d %" PRIu64, f->bcast_st_cnt,
          f->bcast_st_bytes);
     mlog(FDIO_INFO, "stdin (cnt/bytes): %d %" PRIu64 ", console (cnt/bytes): "
-                    "%d %" PRIu64, f->stdin_cnt, f->stdin_bytes,
-                    f->console_cnt, f->console_bytes);
+                    "%d %" PRIu64 ", appout (cnt/bytes): %d %" PRIu64,
+                    f->stdin_cnt, f->stdin_bytes,
+                    f->console_cnt, f->console_bytes,
+                    f->appout_cnt, f->appout_bytes);
     mlog(FDIO_INFO, "note-queue: %d, accept: %d", f->notequeue_cnt,
          f->accept_cnt);
     mlog(FDIO_INFO, "bcast-in (cnt/bytes/badsrc): %d %" PRIu64 " %d",
@@ -206,6 +208,8 @@ static void log_gstats(struct mpi_args *ma, struct mvp_stats *asts, int nbins,
         fprintf(g, "%d.stdin.bytes=%" PRIu64 "\n", r, f->stdin_bytes);
         fprintf(g, "%d.console.cnt=%d\n", r, f->console_cnt);
         fprintf(g, "%d.console.bytes=%" PRIu64 "\n", r, f->console_bytes);
+        fprintf(g, "%d.appout.cnt=%d\n", r, f->appout_cnt);
+        fprintf(g, "%d.appout.bytes=%" PRIu64 "\n", r, f->appout_bytes);
         fprintf(g, "%d.notequeue.cnt: %d\n", r, f->notequeue_cnt);
         fprintf(g, "%d.accept.cnt: %d\n", r, f->accept_cnt);
         fprintf(g, "%d.bcastin.cnt=%d\n", r, f->bcastin_cnt);
@@ -343,7 +347,6 @@ static void log_report(int rcount, struct mvp_stats *asts,
              ", max=r%d@%" PRIu64 ")",
          tmi[0].total / (double) rcount, tmi[0].minrank, tmi[0].minval,
          tmi[0].maxrank, tmi[0].maxval);
-
 
 #undef LL
 #undef roff

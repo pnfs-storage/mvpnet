@@ -398,8 +398,13 @@ int mpi_main(struct mpi_args *ma) {
     }
 
     /*
-     * we are ready to init and start the MPI networking loop
+     * we are ready to trigger the app and start the MPI network loop.
+     * the fdio thread decides how it wans to handle the APPTRIG.
      */
+    if (mvp_notify_fdio(ma->a->mq, FDIO_NOTE_APPTRIG) < 0) {
+        /* this should never happen */
+        mlog_exit(1, MPI_CRIT, "APPTRIG note failed?");
+    }
     while (a->fdio_state == FDIO_RUN) {
 
         /*

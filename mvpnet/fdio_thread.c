@@ -70,7 +70,8 @@
 #define PF_ST_CONN       4   /* stream: connected socket (if connected) */
 #define PF_DG_QOUT       3   /* dgram: qemu pkt output (we recv()) */
 #define PF_DG_QIN        4   /* dgram: qemu pkt input (we send()) */
-#define PF_NFDS          5   /* size of pfd[] array needed */
+#define PF_APPOUT        5   /* application script output (if running) */
+#define PF_NFDS          6   /* size of pfd[] array needed */
 
 /* struct with qemu sender state */
 struct qemusender {
@@ -78,6 +79,23 @@ struct qemusender {
     int nsent;               /* number of bytes sent so far */
     int blocked;             /* got EWOULDBLOCK on last send, wait to clear */
     int pending;             /* !=0  if we know more rqes are pending */
+};
+
+/* app states */
+#define APP_PENDING    0     /* waiting for all ranks to be ready */
+#define APP_TRIGGERED  1     /* all ranks ready, app start triggered */
+#define APP_RUNNING    2     /* app is running */
+#define APP_DONE       3     /* app finished and wait status collected */
+#define APP_FAILED     4     /* app finished w/failure, no wait status */
+#define APP_DISABLED   5     /* app not enabled on this rank */
+
+/* struct with app related info */
+struct appinfo {
+    int app_state;           /* current state of app */
+    pid_t app_pid;           /* pid of app (if running) */
+    int app_fd_in;           /* app's stdin fd (if running) */
+    int app_fd_out;          /* app's stdout fd (if running) */
+    int app_wstatus;         /* app wait() status, if state is APP_DONE */
 };
 
 /*
@@ -549,7 +567,7 @@ static void fdio_read_qconsole(struct fdio_args *a, struct pollfd *pf,
  */
 static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
                                     int *finalstate, struct runthread *sshp,
-                                    int *qstdinp) {
+                                    struct appinfo *appip, int *qstdinp) {
     char buf;
     ssize_t got;
     int ret, nchild, children[2], ndraining;
@@ -662,6 +680,14 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
         mlog(FDIO_DBG, "readnote: SNDSHUT relay (nchild=%d, draining=%d)",
              nchild, ndraining);
 
+        break;
+    case FDIO_NOTE_APPTRIG:      /* app startup trigger */
+        if (appip->app_state == APP_PENDING) {
+            mlog(FDIO_DBG, "readnote: APPTRIG: setting trigger");
+            appip->app_state = APP_TRIGGERED;
+        } else {
+            mlog(FDIO_DBG, "readnote: APPTRIG: ignored (!pending)");
+        }
         break;
     default:
         mlog_exit(1, FDIO_CRIT, "readnote: unknown note %d!", buf);
@@ -892,6 +918,80 @@ static void fdio_write_dgtoqemu(struct fdio_args *a, struct pollfd *pf,
 }
 
 /*
+ * app startup.  only called if app script is in APP_TRIGGERED state.
+ */
+static void fdio_app_startup(struct fdio_args *a, struct pollfd *pf,
+                             struct appinfo *appip, int *finalstate) {
+    mlog(FDIO_INFO, "app: starting %s", a->app_argv[0]);
+
+    appip->app_pid = fdforkprog(a->app_argv[0], a->app_argv, FDFPROG_FIOD,
+                                &appip->app_fd_in, &appip->app_fd_out,
+                                NULL, mvp_closelog, NULL);
+
+    if (appip->app_pid == -1) { /* unlikely (failed before successful fork) */
+        mlog(FDIO_CRIT, "app: %s startup FAILED!", a->app_argv[0]);
+        appip->app_state = APP_FAILED;
+        *finalstate = FDIO_ERROR;
+        return;
+    }
+
+    /* mark as running, start monitoring it for output or EOF (exited) */
+    mlog(FDIO_INFO, "app: running %s, pid=%d", a->app_argv[0], appip->app_pid);
+    appip->app_state = APP_RUNNING;
+    pf->fd = appip->app_fd_out;      /* enables polling for app output */
+}
+
+/*
+ * PF_APPOUT is readable.  this indicates that the we got output from
+ * a running app script.   if we read an EOF from the app we assume
+ * that it has exited (closing the pipe we are reading).   on exit
+ * we collect the app's exit status and trigger a shutdown.
+ */
+static void fdio_read_appout(struct fdio_args *a, struct pollfd *pf,
+                             struct appinfo *appip, int *finalstate) {
+    char buf[BUFSIZ];
+    ssize_t got, put;
+
+    got = read(pf->fd, buf, sizeof(buf));
+
+    if (got < 1) {       /* EOF or error from app read */
+
+        pf->fd = -1;     /* disable polling */
+        close(appip->app_fd_in);
+        close(appip->app_fd_out);
+
+        if (appip->app_pid < 1 ||    /* to be safe */
+            tfinishpid(appip->app_pid, &appip->app_wstatus, 2) < 0) {
+            *finalstate = FDIO_ERROR;
+            appip->app_state = APP_FAILED;
+            mlog(FDIO_CRIT, "appout: finishfailed (pid=%d)", appip->app_pid);
+        } else {
+            appip->app_state = APP_DONE;
+            mlog(FDIO_DBG, "appout: done.  wstatus=%#x", appip->app_wstatus);
+        }
+
+        if (mvp_notify_fdio(a->mq, FDIO_NOTE_SNDSHUT) < 0) {
+            mlog(FDIO_CRIT, "appout: SNDSHUT notify failed!");
+            *finalstate = FDIO_ERROR;
+        } else {
+            mlog(FDIO_INFO, "appout: issued SNDSHUT");
+        }
+
+    } else {             /* data from app read */
+
+        a->fst.appout_cnt++;
+        a->fst.appout_bytes += got;
+        if (a->out_appout) {
+            put = write(fileno(stdout), buf, got);
+            if (put != got)
+                mlog(FDIO_ERR, "appout: write mismatch %zd != %zd", put, got);
+        }
+
+    }
+
+}
+
+/*
  * convert state to string (for debug prints)
  */
 char *fdio_statestr(int state) {
@@ -917,11 +1017,13 @@ void *fdio_main(void *arg) {
     int final_state = FDIO_NONE;
 
     struct pollfd pfd[PF_NFDS];
+    struct appinfo appi = { .app_state = APP_DISABLED, .app_pid = -1,
+                            .app_fd_in = -1, .app_fd_out = -1 };
     pid_t qemupid;
     int qemu_stdin, ret;
     struct runthread sshprobe = {0};
     struct qemusender cur_qsend = { NULL };
-    int ptimeout;
+    int ptimeout, wstat;
 
     fdio_set_state(a, FDIO_PREP);    /* prepare to start qemu */
 
@@ -944,6 +1046,14 @@ void *fdio_main(void *arg) {
         pfd[PF_DG_QOUT].events = POLLIN;
         pfd[PF_DG_QIN].fd = a->sockfds[1];   /* send dgrams, after connect */
         pfd[PF_DG_QIN].events = 0;
+    }
+    pfd[PF_APPOUT].fd = -1;             /* set when/if we fdforkprog() */
+    pfd[PF_APPOUT].events = POLLIN;
+
+    /* enable app we are rank 0 and an app was specified */
+    if (a->mi.rank == 0 && a->app_argc != 0) {
+        mlog(FDIO_DBG, "main: app enabled on rank 0");
+        appi.app_state = APP_PENDING;
     }
 
     /* now we can finally start qemu! */
@@ -1015,7 +1125,7 @@ void *fdio_main(void *arg) {
             }
             if (pfd[PF_NOTIFY].revents & (POLLIN|POLLHUP)) {
                 fdio_read_notifications(a, &pfd[PF_NOTIFY], &final_state,
-                                        &sshprobe, &qemu_stdin);
+                                        &sshprobe, &appi, &qemu_stdin);
                 if (final_state != FDIO_NONE)
                     break;
             }
@@ -1057,7 +1167,21 @@ void *fdio_main(void *arg) {
                 }
 
             }
+            if (pfd[PF_APPOUT].revents & (POLLIN|POLLHUP)) {
+                fdio_read_appout(a, &pfd[PF_APPOUT], &appi, &final_state);
+                if (final_state != FDIO_NONE)
+                    break;
+            }
         }   /* ret > 0 */
+
+        /*
+         * start app if triggered
+         */
+        if (appi.app_state == APP_TRIGGERED) {
+            fdio_app_startup(a, &pfd[PF_APPOUT], &appi, &final_state);
+            if (final_state != FDIO_NONE)
+                break;
+        }
 
         /*
          * if cur_qsend is not blocked attempt to make rqe progress
@@ -1093,6 +1217,31 @@ void *fdio_main(void *arg) {
 done:   /* clean up and terminate the fdio thread */
     mlog(FDIO_DBG, "main: exited main poll loop - start cleanup");
 
+    if (appi.app_pid > 0 && appi.app_state == APP_RUNNING) {
+        /*
+         * exited loop with app still running.  normally if we had
+         * an app we would expect it to exit before here, so it is
+         * ok to just kill it...
+         */
+        kill(appi.app_pid, SIGTERM);
+        if (tfinishpid(appi.app_pid, &appi.app_wstatus, 2) == -1) {
+            mlog(FDIO_CRIT, "main: finish app failed");
+            appi.app_state = APP_FAILED;
+        } else {
+            appi.app_state = APP_DONE;
+        }
+    }
+
+    if (appi.app_state == APP_DONE) {
+        if (WIFEXITED(appi.app_wstatus))
+            mlog(FDIO_INFO, "main: app exit(%d)",
+                 WEXITSTATUS(appi.app_wstatus));
+        else if (WIFSIGNALED(appi.app_wstatus))
+            mlog(FDIO_INFO, "main: app SIG(%d)", WTERMSIG(appi.app_wstatus));
+        else
+            mlog(FDIO_INFO, "main: app wstat=%#x", appi.app_wstatus);
+    }
+
     /* dispose of any rqes we are sending */
     fdio_qemusend_done(a, &cur_qsend);
 
@@ -1104,16 +1253,18 @@ done:   /* clean up and terminate the fdio thread */
 
     /* wait for qemu and kill if it does not appear to be wrapping up */
     if (qemupid > 0) {
-        struct timeval tv;
         if (qemu_stdin >= 0)
             close(qemu_stdin);   /* EOF tells wrapper to shutdown+exit */
         /* backstop the wrapper shutdown with our own timeout */
-        tv.tv_sec = 120;
-        tv.tv_usec = 0;
-        if (twaitpid(&tv, qemupid, NULL) == 0) {
-            warnx("qemu did not exit on EOF in time!  sending SIGKILL");
-            kill(qemupid, SIGKILL);
-            waitpid(qemupid, NULL, 0);
+        if (tfinishpid(qemupid, &wstat, 120) == -1) {
+            mlog(FDIO_CRIT, "main: finish qemupid failed");
+        } else {
+            if (WIFEXITED(wstat))
+                mlog(FDIO_INFO, "main: qemupid exit(%d)", WEXITSTATUS(wstat));
+            else if (WIFSIGNALED(wstat))
+                mlog(FDIO_INFO, "main: qemupid SIG(%d)", WTERMSIG(wstat));
+            else
+                mlog(FDIO_INFO, "main: qemupid wstat=%#x", wstat);
         }
     }
 

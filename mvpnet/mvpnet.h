@@ -70,6 +70,7 @@ struct mvpopts {
     int mem_mb;            /* #mb of memory for guest VM */
     char *monwrap;         /* monwrap program */
     int nettype;           /* type of local socket to use for qemu network */
+    int out_appout;        /* print app output to stdout */
     char *processor;       /* processor type to use w/qemu */
     char *qemucmd;         /* qemu command */
     char *rundir;          /* runtime directory to copy image to */
