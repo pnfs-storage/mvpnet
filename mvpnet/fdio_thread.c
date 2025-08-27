@@ -73,7 +73,7 @@
 #define PF_APPOUT        5   /* application script output (if running) */
 #define PF_NFDS          6   /* size of pfd[] array needed */
 
-/* struct with qemu sender state */
+/* state for rqe data currently being sent over socket to local qemu */
 struct qemusender {
     struct recvq_entry *rqe; /* currently being sent to qemu */
     int nsent;               /* number of bytes sent so far */
@@ -448,7 +448,7 @@ static size_t fdio_fbstream_cb(struct fbuf *fbuf, char *fstart,
         memcpy(&framelen, ptr, sizeof(framelen));
         framelen = ntohl(framelen) + sizeof(framelen);
 
-        if (framelen > MVP_FBUFMIN)     /* sanity check */
+        if (framelen > MVP_FBUFMIN)     /* sanity check, shouldn't happen */
             mlog_abort(FDIO_CRIT, "streamcb: BAD framlen %" PRId32, framelen);
 
         if (nleft < framelen) {  /* incomplete frame, save for later */
@@ -606,7 +606,7 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
              * unix domain socket it created to recv packets from us on.
              */
             ret = strlen(a->socknames[1]) + 1;
-            if (ret > sizeof(sun.sun_path))
+            if (ret > sizeof(sun.sun_path))         /* unlikely */
                 mlog_abort(FDIO_CRIT, "readnote: dgram sockname too long!");
             memset(&sun, 0, sizeof(sun));
             sun.sun_family = AF_LOCAL;
@@ -618,6 +618,7 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
                 *finalstate = FDIO_ERROR;
                 break;
             }
+            /* F_SETFL sock to nonblock fail?  shouldn't happen! */
             if (fcntl(a->sockfds[1], F_SETFL, O_NONBLOCK) < 0)
                 mlog_exit(1, FDIO_CRIT, "readnote: dg: fcntl: %d failed: %s",
                           a->sockfds[1], strerror(errno));
@@ -1050,7 +1051,7 @@ void *fdio_main(void *arg) {
     pfd[PF_APPOUT].fd = -1;             /* set when/if we fdforkprog() */
     pfd[PF_APPOUT].events = POLLIN;
 
-    /* enable app we are rank 0 and an app was specified */
+    /* enable app if we are rank 0 and an app was specified */
     if (a->mi.rank == 0 && a->app_argc != 0) {
         mlog(FDIO_DBG, "main: app enabled on rank 0");
         appi.app_state = APP_PENDING;

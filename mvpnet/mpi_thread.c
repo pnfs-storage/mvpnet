@@ -338,6 +338,7 @@ static int mpibpoolrecv(struct mpi_args *ma, MPI_Status *status) {
  */
 int mpi_main(struct mpi_args *ma) {
     struct fdio_args *a = ma->a;
+    int mpiabort = 0;  /* need to abort MPI job */
     int old_fdio_state = FDIO_NONE;    /* inital state */
     int fdio_run, total, ret, pflag, nbins;
     struct mpimtsmgr mts = MPIMTSMGR_INIT;
@@ -374,6 +375,7 @@ int mpi_main(struct mpi_args *ma) {
                         MPI_SUM, ma->mi.comm);  /* collective call! */
     if (ret != MPI_SUCCESS) {
         mlog(MPI_CRIT, "MPI_Allreduce failed (%d)", ret);
+        mpiabort++;
         goto done;
     }
     if (total < ma->mi.wsize) {
@@ -381,7 +383,7 @@ int mpi_main(struct mpi_args *ma) {
             mlog(MPI_CRIT, "%d of %d ranks failed to boot - exiting!",
                  ma->mi.wsize - total, ma->mi.wsize);
         ret = 1;
-        goto done;
+        goto done;    /* no need to mpiabort here */
     }
     mlog(MPI_NOTE, "fdio globally running (wsize=%d)", ma->mi.wsize);
 
@@ -394,6 +396,7 @@ int mpi_main(struct mpi_args *ma) {
     if (mpimts_init(&mts, stats.ms.mts_initsz) != 0) {
         /* slot memory allocation failure */
         mlog(MPI_CRIT, "mpimts_init failed (initsz=%d)", ma->mts_initsz);
+        mpiabort++;
         goto done;
     }
 
@@ -403,9 +406,11 @@ int mpi_main(struct mpi_args *ma) {
      */
     if (mvp_notify_fdio(ma->a->mq, FDIO_NOTE_APPTRIG) < 0) {
         /* this should never happen */
-        mlog_exit(1, MPI_CRIT, "APPTRIG note failed?");
+        mlog(MPI_CRIT, "APPTRIG note failed?");
+        mpiabort++;
+        goto done;
     }
-    while (a->fdio_state == FDIO_RUN) {
+    while (a->fdio_state == FDIO_RUN) {     /* main mpi thread loop */
 
         /*
          * send side: check for complete async MPI_Isend ops using mts.
@@ -413,6 +418,7 @@ int mpi_main(struct mpi_args *ma) {
          */
         if (mpimts_test(&mts, ma) != 0) {
             mlog(MPI_ERR, "mpi_main: mpimts_test failed!  exit.");
+            mpiabort++;
             goto done;
         }
 
@@ -458,6 +464,7 @@ int mpi_main(struct mpi_args *ma) {
 
         if (ret != MPI_SUCCESS) {
             mlog(MPI_ERR, "mpi_main: MPI_Iprobe failed %d!  exit.", ret);
+            mpiabort++;
             goto done;
         }
         if (pflag) {
@@ -478,7 +485,7 @@ int mpi_main(struct mpi_args *ma) {
         sched_yield();
     }
 
-    mlog(MPI_NOTE, "exited main loop, fdio state=%s",
+    mlog(MPI_NOTE, "exited main loop due to fdio stop, fdio state=%s",
          fdio_statestr(a->fdio_state));
 
 done:
@@ -491,6 +498,13 @@ done:
         pthread_join(ma->fdio->pth, NULL);
         mlog(MPI_INFO, "fdio thread join complete!");
         ma->fdio->can_join = 0;
+    }
+
+    /* if something is wrong, skip stat collectives and abort mpi job now */
+    if (mpiabort || a->fdio_state == FDIO_ERROR) {
+        mlog(MPI_CRIT, "abort mpi job due to error (%d, %d)", mpiabort,
+             a->fdio_state == FDIO_ERROR);
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     /* copy mts stats out into stats.ms so it is fully sync'd */

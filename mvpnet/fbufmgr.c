@@ -326,7 +326,7 @@ ssize_t fbufmgr_recv(struct fbufmgr *mgr, int sock,
 void fbuf_loan(struct fbuf *fbuf, int nloan) {
     struct fbufmgr *mgr = fbuf->mgr;
 
-    if (nloan < 1)
+    if (nloan < 1)    /* shouldn't happen */
         mlog_abort(FBUF_CRIT, "fbuf_loan: invalid nloan %d", nloan);
     pthread_mutex_lock(&mgr->lck);
     fbuf->loancnt += nloan;

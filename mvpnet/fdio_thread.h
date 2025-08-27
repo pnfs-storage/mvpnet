@@ -51,7 +51,6 @@
 #define FDIO_BOOT_Q       3  /* booting, waiting on qemu (net up!) */
 #define FDIO_BOOT_N       4  /* booting, waiting on network (qemu up!) */
 #define FDIO_RUN          5  /* qemu is up and running */
-/* XXX: states about user app script? */
 #define FDIO_DONE         6  /* qemu (and fdio) is done, ok to join thread */
 #define FDIO_ERROR        7  /* fdio got an error, ok to join */
 
