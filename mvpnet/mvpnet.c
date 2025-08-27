@@ -344,7 +344,7 @@ int main(int argc, char **argv) {
      * see discussion of POSIXLY_CORRECT in glib getopt man page.
      */
     while ((ch = getopt(argc, argv,
-            "+B:c:C:d:D:ghi:Ij:k:l:L:m:M:n:Op:q:r:s:S:t:T:u:w:X:")) != -1) {
+            "+B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:Op:q:r:s:S:t:T:u:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
