@@ -75,6 +75,7 @@ struct fdio_stats {
     int unicast_cnt;         /* number of unicast frames from qemu */
     uint64_t unicast_bytes;  /* number of unicast bytes from qemu */
     int arpreq_badreq;       /* number of discarded bad arp requests */
+    int arpreq_gratuitous;   /* number of gratuitous arps we got from qemu */
     int arpreq_cnt;          /* number of good arp requests processed */
     int bcast_st_cnt;        /* number of bcasts our qemu started */
     uint64_t bcast_st_bytes; /* nubmer of bcast start bytes our qemu sent */

@@ -346,11 +346,16 @@ static void fdio_process_qframe(struct fbuf *fbuf, char *fstart, int nbytes,
             return;  /* drop the req */
         }
 
-        if (arp_qrank < 0 || arp_qrank >= a->mi.wsize ||
-            arp_qrank == a->mi.rank) {
+        if (arp_qrank < 0 || arp_qrank >= a->mi.wsize) {
             a->fst.arpreq_badreq++;
             mlog(FDIO_INFO, "pqframe: bad bcast-ARP for %d, drop!", arp_qrank);
             return;  /* drop req if unknown rank or for self */
+        }
+
+        if (arp_qrank == a->mi.rank) {   /* arp our own rank? */
+            a->fst.arpreq_gratuitous++;
+            mlog(FDIO_DBG, "pqframe: discard gratuitous ARP for %d", arp_qrank);
+            return;  /* drop gratuitous arp requests */
         }
 
         mlog(FDIO_DBG, "pqframe: bcast-ARP: %d for %d, fbuf=%p",

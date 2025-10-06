@@ -108,8 +108,8 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
     mlog(FDIO_INFO, "runts=%d", f->runt_cnt);
     mlog(FDIO_INFO, "unicast (cnt/bytes/bad-dst): %d %" PRIu64 " %d",
          f->unicast_cnt, f->unicast_bytes, f->unicast_baddst);
-    mlog(FDIO_INFO, "arpreq (cnt/badreq): %d %d", f->arpreq_cnt,
-         f->arpreq_badreq);
+    mlog(FDIO_INFO, "arpreq (cnt/badreq/gratuitous): %d %d %d", f->arpreq_cnt,
+         f->arpreq_badreq, f->arpreq_gratuitous);
     mlog(FDIO_INFO, "bcast-start (cnt/bytes): %d %" PRIu64, f->bcast_st_cnt,
          f->bcast_st_bytes);
     mlog(FDIO_INFO, "stdin (cnt/bytes): %d %" PRIu64 ", console (cnt/bytes): "
@@ -202,6 +202,7 @@ static void log_gstats(struct mpi_args *ma, struct mvp_stats *asts, int nbins,
         fprintf(g, "%d.unicast.baddst=%d\n", r, f->unicast_baddst);
         fprintf(g, "%d.arpreq.cnt=%d\n", r, f->arpreq_cnt);
         fprintf(g, "%d.arpreq.badreq=%d\n", r, f->arpreq_badreq);
+        fprintf(g, "%d.arpreq.gratuitous=%d\n", r, f->arpreq_gratuitous);
         fprintf(g, "%d.bcaststart.cnt=%d\n", r, f->bcast_st_cnt);
         fprintf(g, "%d.bcaststart.bytes=%" PRIu64 "\n", r, f->bcast_st_bytes);
         fprintf(g, "%d.stdin.cnt=%d\n", r, f->stdin_cnt);
