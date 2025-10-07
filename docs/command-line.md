@@ -46,7 +46,7 @@ Logging-related flags are:
 
         # what logs to enable
 	-C [val]   *console output log on (1) or off (0) (def=0)
-	-L [val]   *mpv mlog on (1) or off (0) (def=0)
+	-L [val]   *mvp mlog on (1) or off (0) (def=0)
 	-w [val]   *wrapper log on (1) or off (0) (def=0)
 
         # in memory log size, logging level

@@ -23,6 +23,9 @@ cat /mnt/id_ed25519.pub >> /root/.ssh/authorized_keys
 # add uncommented line (otherwise mpich fails):
 echo '    StrictHostKeyChecking no' >> /etc/ssh/ssh_config
 
+# freebsd doesn't allow root logins by default
+echo 'PermitRootLogin prohibit-password' >> /etc/ssh/sshd_config
+
 # remove /etc/hostname so that guest gets hostname from qemu dhcp:
 rm -f /etc/hostname
 

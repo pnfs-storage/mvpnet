@@ -52,6 +52,7 @@ cat > ${seed_dir}/user-data << EOF || die "couldn't create user-data file"
 #
 bootcmd:
   - mount -oro /dev/disk/by-label/cidata /mnt
+  - mount -oro -tmsdos /dev/msdosfs/cidata /mnt # freebsd version, ok to fail on linux
   - [ cloud-init-per, once, imageprep, sh, -c, '/mnt/imageprep.sh' ]
   - [ cloud-init-per, always, mvpnet-init, sh, -c, '/mnt/mvpnet-init' ]
 user:

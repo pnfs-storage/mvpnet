@@ -31,9 +31,41 @@ rank2mvpip () {
   echo "10.${a}.${b}.${c}"
 }
 
-ip -br link > /dev/null || die "cannot open ip link"
+# define mac and ip addr functions for different systems
+if [ $(uname) = "Linux" ]; then
+  getmacs() {
+    ip -br link | awk '{print $1, $3}' || die "cannot open ip link"
+  }
+  getaddr() {
+    ip -br addr show dev ${1} > /dev/null || die "cannot open ip inet"
+  }
+  setaddr() {
+    ip addr add ${1} broadcast 10.255.255.255 dev ${2} || die "setting ip failed"
+  }
+  ifup() {
+    ip link set ${1} up || die "ip up failed"
+  }
+elif [ $(uname) = "FreeBSD" ]; then
+  getmacs() {
+    ifconfig > /dev/null || die "cannot get ifconfig"
+    for interface in $(ifconfig -l ether); do
+      ifconfig ${interface} ether | xargs | awk '{print $1, $9}' | sed 's/://'
+    done
+  }
+  getaddr() {
+    ifconfig -f inet:cidr ${1} inet | xargs | awk '{print $9}' || die "cannot open ifconfig inet"
+  }
+  setaddr() {
+    ifconfig ${2} inet ${1} broadcast 10.255.255.255 up || die "setting ip failed"
+  }
+  ifup() {
+    ifconfig ${1} up || die "ifconfig up failed"
+  }
+else
+  die "don't know how to get network config on this system"
+fi
 
-eval $(ip -br l | while read iface status mac rest; do
+eval $(getmacs | while read iface mac; do
   if (echo ${mac} | grep -q "^52:56"); then
     echo wsize=$(mvpmac2rank $(echo ${mac} | cut -f4-6 -d":"))
     echo useriface=${iface}
@@ -79,19 +111,18 @@ done > /etc/hosts.mpi || die "couldn't write /etc/hosts.mpi"
 
 # ensure MPI interface is up if we found one
 if [ -n ${mvpiface} ]; then
-  ip -br addr show dev ${mvpiface} > /dev/null || die "cannot open ip inet"
-  addrs=$(ip -br addr show dev ${mvpiface} | awk '{print $3}')
+  addrs=$(getaddr ${mvpiface})
   if [ -n ${addrs} ]; then
     # the real IP address is one bit more than what we get from the rank
     n=$((${rank}+1))
     myaddr=$(rank2mvpip ${n})/8
     echo "assign addr ${myaddr} to ${mvpiface}"
-    ip addr add ${myaddr} broadcast 10.255.255.255 dev ${mvpiface} || die "ip failed"
+    setaddr ${myaddr} ${mvpiface}
   else
     echo "${mvpiface} already has an ip address"
   fi
   echo "ensuring ${mvpiface} is up"
-  ip link set ${mvpiface} up || die "ip failed"
+  ifup ${mvpiface}
 fi
 
 echo "mvpnet-init done!"
