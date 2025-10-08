@@ -41,5 +41,9 @@ configure it using this script
 
 * `install-packages.sh`: shows how one might go about automatically adding a
 set of software packages at the time guest VM is instantiated.  It gets its
-input from a plain textfile named `packagelist` in the cloud-seed directory.
+input from a plain text file in the cloud-seed directory named
+`packagelist.${distro}` containing a list of package names, one per line.  It
+should work for any distro of
+`debian|ubuntu|fedora|rhel|centos|rocky|almalinux|freebsd`.  You could also
+choose to replace the entire file with a customized installation script.
 

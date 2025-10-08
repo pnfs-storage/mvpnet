@@ -17,8 +17,6 @@
 cp /mnt/id_ed25519 /mnt/id_ed25519.pub /root/.ssh/
 chmod 400 /root/.ssh/id_ed25519
 cat /mnt/id_ed25519.pub >> /root/.ssh/authorized_keys
-# for normal user
-# XXX: how to get default username???
 
 # add uncommented line (otherwise mpich fails):
 echo '    StrictHostKeyChecking no' >> /etc/ssh/ssh_config
@@ -28,6 +26,3 @@ echo 'PermitRootLogin prohibit-password' >> /etc/ssh/sshd_config
 
 # remove /etc/hostname so that guest gets hostname from qemu dhcp:
 rm -f /etc/hostname
-
-# install packages. create this script to install packages as you want
-/mnt/install-packages.sh

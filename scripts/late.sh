@@ -23,3 +23,6 @@ for u in $(grep ": Adding user " /var/log/cloud-init*|awk '{print $NF}'); do
   chown ${u}:${u} /home/${u}/.ssh/id_ed25519 /home/${u}/.ssh/id_ed25519.pub
   chmod 400 /home/${u}/.ssh/id_ed25519
 done
+
+# install packages. create this script to install packages as you want
+/mnt/install-packages.sh
