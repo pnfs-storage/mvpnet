@@ -598,6 +598,7 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
         pthread_join(sshp->pth, NULL);  /* finalize thread */
         sshp->can_join = 0;
         if (buf == FDIO_NOTE_NOSSHD) {  /* guest failed to start sshd */
+            mlog(FDIO_ERR, "readnote: sshprobe operation failed!");
             *finalstate = FDIO_ERROR;
             break;
         }
