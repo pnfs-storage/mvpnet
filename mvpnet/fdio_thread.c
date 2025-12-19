@@ -98,6 +98,36 @@ struct appinfo {
     int app_wstatus;         /* app wait() status, if state is APP_DONE */
 };
 
+/* stats returned by sshprobe */
+struct sshprobestat {
+    int complete;            /* ssh probe completed */
+    struct timeval tstart;   /* time at probe state */
+    struct timeval tend;     /* time at probe end */
+    int ms_start;            /* ms left at probe start */
+    int ms_end;              /* ns left at probe end */
+    int nloop;               /* loop count */
+    int endstate;            /* state at end */
+    int error;               /* error: 0 ok, 1 socket, 2 fcntl, 3 timeout */
+    int xerrno;              /* set for for verror 1 or 2 */
+    int con_ecnt;            /* connect() fails but not with EINPROGRESS */
+    int pollo_ecnt;          /* poll() POLLOUT returns < 1 */
+    int polli_ecnt;          /* poll() POLLIN returns < 1 */
+    int read_ecnt;           /* read() rets <0 */
+    int mismatch_ecnt;       /* data mismatch error count */
+};
+
+/* args to sshprobe thread */
+struct sshprobe_args {
+    struct fdio_args *a;     /* pass down the fdio thread args */
+    struct sshprobestat sps; /* stats collected by ssh probe */
+};
+
+/* complete info about sshprobe thread */
+struct sshprobe_info {
+    struct runthread sshprobe;   /* pthread info for probe */
+    struct sshprobe_args spa;    /* args to probe */
+};
+
 /*
  * helper functions
  */
@@ -192,7 +222,9 @@ static void fdio_broadcast(struct fbuf *fbuf, char *fstart, int nbytes,
 
 /* ssh probe thread main */
 static void *fdio_sshprobe(void *arg) {
-    struct fdio_args *a = arg;
+    struct sshprobe_args *spa = arg;
+    struct fdio_args *a = spa->a;
+    struct sshprobestat *sps = &spa->sps;
     char note;
     int ms_left, s, ret;
     struct sockaddr_in sin;
@@ -200,8 +232,11 @@ static void *fdio_sshprobe(void *arg) {
     struct pollfd pf;
     char line[128];
 
+    memset(sps, 0, sizeof(*sps));          /* zero out stats to start */
     note = FDIO_NOTE_NOSSHD;               /* default is to fail... */
     ms_left = a->sshprobe_timeout * 1000;  /* timeout (cvt from secs) */
+    gettimeofday(&sps->tstart, NULL);
+    sps->ms_start = ms_left;
 
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -212,17 +247,24 @@ static void *fdio_sshprobe(void *arg) {
                                    a->fdio_state == FDIO_BOOT_Q) ;
          ms_left -= ms_time(&tbase, 0)) {
 
+        sps->nloop++;
         ms_time(&tbase, 1);    /* set time */
 
-        if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0)
+        if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+            sps->error = 1;
+            sps->xerrno = errno;
             goto done;
+        }
         if (fcntl(s, F_SETFL, O_NONBLOCK) < 0) { /* no block in connect */
+            sps->error = 2;
+            sps->xerrno = errno;
             close(s);
             goto done;
         }
 
         if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0 &&
             errno != EINPROGRESS) {
+            sps->con_ecnt++;
             close(s);
             NSLEEP(0, 500000000);   /* pause 1/2 a sec and try again */
             continue;
@@ -233,6 +275,7 @@ static void *fdio_sshprobe(void *arg) {
         pf.events = POLLOUT;
         pf.revents = 0;
         if (poll(&pf, 1, ms_left) < 1) {
+            sps->pollo_ecnt++;
             close(s);
             continue;
         }
@@ -244,6 +287,7 @@ static void *fdio_sshprobe(void *arg) {
         /* connected, now wait for data */
         pf.events = POLLIN;
         if (poll(&pf, 1, ms_left) < 1) {
+            sps->polli_ecnt++;
             close(s);
             continue;
         }
@@ -252,6 +296,7 @@ static void *fdio_sshprobe(void *arg) {
         ret = read(s, line, sizeof(line) - 1);
         close(s);           /* close socket either way */
         if (ret < 0) {
+            sps->pollo_ecnt++;
             NSLEEP(0, 500000000);   /* pause 1/2 a sec and try again */
             continue;
         }
@@ -260,12 +305,23 @@ static void *fdio_sshprobe(void *arg) {
         /* check for ssh banner */
         if (strncmp(line, "SSH-", 4) == 0) {   /* success? */
             note = FDIO_NOTE_SSHD;
+            ms_left -= ms_time(&tbase, 0);     /* sync ms_left before break */
             break;
         }
+        sps->mismatch_ecnt++;
         NSLEEP(1, 0);     /* pause a second and try again */
     }
 
+    if (note == FDIO_NOTE_NOSSHD) {    /* exited loop w/o sshd running? */
+        sps->error = 3;
+    }
+
 done:
+    gettimeofday(&sps->tend, NULL);
+    sps->ms_end = ms_left;
+    sps->endstate = a->fdio_state;
+    sps->complete = 1;
+
     /* notify parent thread we are done and our status */
     if (write(a->mq->fdio_notify[NOTE_WR], &note, 1) < 0)
         fprintf(stderr, "write: NOTE_WR: %s\n", strerror(errno));
@@ -571,10 +627,11 @@ static void fdio_read_qconsole(struct fdio_args *a, struct pollfd *pf,
  * everything (including our thread) is part of the same process.
  */
 static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
-                                    int *finalstate, struct runthread *sshp,
+                                    int *finalstate, struct sshprobe_info *spi,
                                     struct appinfo *appip, int *qstdinp) {
     char buf;
     ssize_t got;
+    struct sshprobestat *sps;
     int ret, nchild, children[2], ndraining;
     struct sockaddr_un sun;
     void *sbc_pkt;             /* shutdown broadcast pkg buffer */
@@ -595,13 +652,27 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
     case FDIO_NOTE_SSHD:               /* sshd probe completed */
     case FDIO_NOTE_NOSSHD:
         mlog(FDIO_DBG, "readnote: SSHD (ok=%d)", buf == FDIO_NOTE_SSHD);
-        pthread_join(sshp->pth, NULL);  /* finalize thread */
-        sshp->can_join = 0;
+        pthread_join(spi->sshprobe.pth, NULL);  /* finalize thread */
+        spi->sshprobe.can_join = 0;
+        sps = &spi->spa.sps;
         if (buf == FDIO_NOTE_NOSSHD) {  /* guest failed to start sshd */
             mlog(FDIO_ERR, "readnote: sshprobe operation failed!");
             *finalstate = FDIO_ERROR;
+            mlog(FDIO_ERR, "sshprobe: complete=%d, nloop=%d, ran %d secs",
+                           sps->complete, sps->nloop,
+                           (int) (sps->tend.tv_sec - sps->tstart.tv_sec) );
+            mlog(FDIO_ERR, "sshprobe: error=%d(%d), endstate=%s, "
+                           "ms_start/end=%d/%d", sps->error, sps->xerrno,
+                           fdio_statestr(sps->endstate),
+                           sps->ms_start, sps->ms_end);
+            mlog(FDIO_ERR, "sshprobe: ecnt: c=%d po=%d pi=%d r=%d m=%d",
+                           sps->con_ecnt, sps->pollo_ecnt, sps->polli_ecnt,
+                           sps->read_ecnt, sps->mismatch_ecnt);
             break;
         }
+        mlog(FDIO_DBG, "sshprobe: complete=%d, nloop=%d, ran %d secs",
+                       sps->complete, sps->nloop,
+                       (int) (sps->tend.tv_sec - sps->tstart.tv_sec) );
         if (a->nettype == SOCK_STREAM) {
             /* we can advance state, we are no longer waiting on Qemu */
             fdio_set_state(a, (a->fdio_state == FDIO_BOOT_QN) ?
@@ -1028,7 +1099,7 @@ void *fdio_main(void *arg) {
                             .app_fd_in = -1, .app_fd_out = -1 };
     pid_t qemupid;
     int qemu_stdin, ret;
-    struct runthread sshprobe = {0};
+    struct sshprobe_info spinfo = { .sshprobe.can_join = 0 };
     struct qemusender cur_qsend = { NULL };
     int ptimeout, wstat;
 
@@ -1082,13 +1153,15 @@ void *fdio_main(void *arg) {
      */
     mlog(FDIO_INFO, "launching sshprobe thread (localport=%d, timeout=%d)",
         a->localsshport, a->sshprobe_timeout);
-    ret = pthread_create(&sshprobe.pth, NULL, fdio_sshprobe, a);
+    spinfo.spa.a = a;
+    ret = pthread_create(&spinfo.sshprobe.pth, NULL, fdio_sshprobe,
+                         &spinfo.spa);
     if (ret != 0) {
         mlog(FDIO_CRIT, "main: pthread_create sshprobe failed (%d)", ret);
         final_state = FDIO_ERROR;
         goto done;
     }
-    sshprobe.can_join = 1;
+    spinfo.sshprobe.can_join = 1;
     fdio_set_state(a, FDIO_BOOT_QN);
 
     /*
@@ -1132,7 +1205,7 @@ void *fdio_main(void *arg) {
             }
             if (pfd[PF_NOTIFY].revents & (POLLIN|POLLHUP)) {
                 fdio_read_notifications(a, &pfd[PF_NOTIFY], &final_state,
-                                        &sshprobe, &appi, &qemu_stdin);
+                                        &spinfo, &appi, &qemu_stdin);
                 if (final_state != FDIO_NONE)
                     break;
             }
@@ -1253,9 +1326,9 @@ done:   /* clean up and terminate the fdio thread */
     fdio_qemusend_done(a, &cur_qsend);
 
     /* collect sshprobe if it still needs to be joined */
-    if (sshprobe.can_join) {
-        pthread_cancel(sshprobe.pth);
-        pthread_join(sshprobe.pth, NULL);
+    if (spinfo.sshprobe.can_join) {
+        pthread_cancel(spinfo.sshprobe.pth);
+        pthread_join(spinfo.sshprobe.pth, NULL);
     }
 
     /* wait for qemu and kill if it does not appear to be wrapping up */
