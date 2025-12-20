@@ -1143,6 +1143,7 @@ void *fdio_main(void *arg) {
         final_state = FDIO_ERROR;
         goto done;
     }
+    fdio_set_state(a, FDIO_BOOT_QN);         /* qemu now running */
     fcntl(qemu_stdin, F_SETFL, O_NONBLOCK);  /* best effort, ignore errors */
 
     /*
@@ -1162,7 +1163,6 @@ void *fdio_main(void *arg) {
         goto done;
     }
     spinfo.sshprobe.can_join = 1;
-    fdio_set_state(a, FDIO_BOOT_QN);
 
     /*
      * main poll loop... loop until we are done.
