@@ -980,6 +980,17 @@ static void fdio_write_dgtoqemu(struct fdio_args *a, struct pollfd *pf,
         return;
     }
 
+    /*
+     * we connect pf->fd to qemu's DGRAM socket when we enter FDIO_RUN state.
+     * drop send() errs (e.g. ENOTCONN) before that (eg internal ARP replies).
+     */
+    if (ret < 0 && a->fdio_state < FDIO_RUN) {
+        a->fst.qemusend_edrop++;       /* trying to send before network up */
+        mlog(FDIO_DBG, "dgtoqemu: early drop, pf->fd !connected yet");
+        fdio_qemusend_done(a, curq);   /* early drop! */
+        return;
+    }
+
     if (ret < 0 && errno == EWOULDBLOCK) {
         /* blocked in send... can this happen with a unix domain dgram? */
         a->fst.qemusend_blocked++;
@@ -990,7 +1001,7 @@ static void fdio_write_dgtoqemu(struct fdio_args *a, struct pollfd *pf,
     }
 
     /* unexpected error... exit fdio */
-    mlog(FDIO_ERR, "dgtoqemu: send error: %s", strerror(errno));
+    mlog(FDIO_ERR, "dgtoqemu: send error: %d/%s", ret, strerror(errno));
     *finalstate = FDIO_DONE;
     return;
 }

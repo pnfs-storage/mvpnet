@@ -103,8 +103,9 @@ static void log_stats(struct mpi_args *ma, struct mvp_stats *sts, int nbins,
     struct que_stats *q = &sts->qs;
     int lcv;
 
-    mlog(FDIO_INFO, "qemusend (cnt/bytes/blocked): %d %" PRIu64 " %d",
-         f->qemusend_cnt, f->qemusend_bytes, f->qemusend_blocked);
+    mlog(FDIO_INFO, "qemusend (cnt/bytes/edrop/blocked): %d %" PRIu64 " %d %d",
+         f->qemusend_cnt, f->qemusend_bytes,
+         f->qemusend_edrop, f->qemusend_blocked);
     mlog(FDIO_INFO, "runts=%d", f->runt_cnt);
     mlog(FDIO_INFO, "unicast (cnt/bytes/bad-dst): %d %" PRIu64 " %d",
          f->unicast_cnt, f->unicast_bytes, f->unicast_baddst);
@@ -195,6 +196,7 @@ static void log_gstats(struct mpi_args *ma, struct mvp_stats *asts, int nbins,
 
         fprintf(g, "%d.qemusend.cnt=%d\n", r, f->qemusend_cnt);
         fprintf(g, "%d.qemusend.bytes=%" PRIu64 "\n", r, f->qemusend_bytes);
+        fprintf(g, "%d.qemusend.edrop=%d\n", r, f->qemusend_edrop);
         fprintf(g, "%d.qemusend.blocked=%d\n", r, f->qemusend_blocked);
         fprintf(g, "%d.runts=%d\n", r, f->runt_cnt);
         fprintf(g, "%d.unicast.cnt=%d\n", r, f->unicast_cnt);

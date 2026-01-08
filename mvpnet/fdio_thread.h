@@ -69,6 +69,7 @@
 struct fdio_stats {
     int qemusend_cnt;        /* number of frames sent to qemu socket */
     uint64_t qemusend_bytes; /* number of bytes sent to qemu socket */
+    int qemusend_edrop;      /* number of times early sends dropped */
     int qemusend_blocked;    /* number of times qemu socket blocked */
     int runt_cnt;            /* number of runt frames from qemu socket */
     int unicast_baddst;      /* number of unicast w/bad dst from qemu */
