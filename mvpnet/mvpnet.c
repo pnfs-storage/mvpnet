@@ -301,8 +301,8 @@ int main(int argc, char **argv) {
     struct mvpopts mopt = MVPOPTS_INIT;
 
     /* tags, filenames, and command line related stuff */
-    char *jobtag, ranktag[32], *mlog_log, *console_log, *gstats_log,
-         *wrapper_log;
+    char *jobtag, ranktag[32], *mlog_log, *mlog_tag, *console_log,
+         *gstats_log, *wrapper_log;
     char *socknames[2];
     int stride, localport;
     struct qemucli_args qcliargs = { 0 };
@@ -587,10 +587,13 @@ int main(int argc, char **argv) {
     for (lcv = 0 ; mkmloghdr_facdef[lcv].sname != NULL ; lcv++) {
         /*null*/;
     }
-    if (mlog_open(prog, lcv, mlog_str2pri(mopt.defpri_ml),
+    if (strgen(&mlog_tag, prog, ranktag, NULL) < 1)
+        errx(1, "unable to generate mlog_tag!");
+    if (mlog_open(mlog_tag, lcv, mlog_str2pri(mopt.defpri_ml),
                   mlog_str2pri(mopt.stderrpri_ml), mlog_log,
                   mopt.bufsz_ml, MLOG_LOGPID|MLOG_OUTTTY, 0) != 0)
         errx(1, "unable to open log");
+    free(mlog_tag);
     for (lcv = 0 ; mkmloghdr_facdef[lcv].sname != NULL ; lcv++) {
         if (mlog_namefacility(lcv, mkmloghdr_facdef[lcv].sname,
                               mkmloghdr_facdef[lcv].lname) != 0)
