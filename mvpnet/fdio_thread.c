@@ -632,10 +632,11 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
     char buf;
     ssize_t got;
     struct sshprobestat *sps;
-    int ret, nchild, children[2], ndraining;
+    int ret, nchild, children[2], xtrahdrsz, totalsz, ndraining;
     struct sockaddr_un sun;
     void *sbc_pkt;             /* shutdown broadcast pkg buffer */
     struct fbuf *sbc_fbuf;
+    uint32_t xtrahdr;
 
     got = read(pf->fd, &buf, sizeof(buf));   /* get the note */
     if (got != 1) {
@@ -737,14 +738,21 @@ static void fdio_read_notifications(struct fdio_args *a, struct pollfd *pf,
         nchild = fdio_binary_router(a->mi.rank, a->mi.wsize, a->mi.rank,
                                     children);
 
+        /* for SOCK_STREAM we must insert the xtra header before the pkt */
         if (nchild > 0) {
-            if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, PKTFMT_SHUTDOWN_LEN,
+            xtrahdrsz = (a->nettype == SOCK_STREAM) ? sizeof(xtrahdr) : 0;
+            totalsz = PKTFMT_SHUTDOWN_LEN + xtrahdrsz;
+            if (fbufmgr_loan_newframe(&a->mq->fbm_bcast, totalsz,
                                       nchild, &sbc_pkt, &sbc_fbuf) != 0) {
                 /* we can still shutdown, but we cannot relay the msg */
                 mlog(FDIO_CRIT, "readnote: SNDSHUT no bcast buffer space!");
             } else {
-                pktfmt_load_shutdown(sbc_pkt); /* len PKTFMT_SHUTDOWN_LEN */
-                fdio_broadcast(sbc_fbuf, sbc_pkt, PKTFMT_SHUTDOWN_LEN,
+                if (xtrahdrsz) {
+                    xtrahdr = htonl(PKTFMT_SHUTDOWN_LEN);
+                    memcpy(sbc_pkt, &xtrahdr, xtrahdrsz);
+                }
+                pktfmt_load_shutdown( ((uint8_t *)sbc_pkt) + xtrahdrsz);
+                fdio_broadcast(sbc_fbuf, sbc_pkt, totalsz,
                                a, "shutdown", nchild, children);
             }
         }
@@ -907,7 +915,7 @@ static void fdio_load_next_rqe(struct fdio_args *a, struct qemusender *curq,
     }
 
     /* check for and handle shudown frames */
-    if (pktfmt_is_shutdown(efrm, curq->rqe->flen)) {
+    if (pktfmt_is_shutdown(efrm, curq->rqe->flen - xtrahdrsz)) {
         fdio_qemusend_done(a, curq);  /* drop, no need to send to qemu */
         ndraining = mvp_sq_draindown(a->mq);
         if (ndraining == 0 && qstdinp >= 0) {
