@@ -261,6 +261,7 @@ void usage(char *prog, int rank) {
     fprintf(stderr, "\t-T [sec]    sshd start probe timeout (secs, def=%d)\n",
             defs.sshprobe_timeout);
     fprintf(stderr, "\t-u [usr]    username on guest (for ssh)\n");
+    fprintf(stderr, "\t-v [smp]   *vcpu smp config (def=1)\n");
     fprintf(stderr, "\t-w [val]   *wrapper log on (1) or off (0) (def=%d)\n",
             defs.wraplog);
     fprintf(stderr, "\t-X [mask]  *mlog mask to set after defaults\n");
@@ -344,7 +345,7 @@ int main(int argc, char **argv) {
      * see discussion of POSIXLY_CORRECT in glib getopt man page.
      */
     while ((ch = getopt(argc, argv,
-            "+B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:Op:q:r:s:S:t:T:u:w:X:")) != -1) {
+            "+B:c:C:d:D:Eghi:Ij:k:l:L:m:M:n:Op:q:r:s:S:t:T:u:v:w:X:")) != -1) {
         switch (ch) {
         case 'B':
             match = prefix_num_match(optarg, ':', mii.rank, &optrest);
@@ -520,6 +521,16 @@ int main(int argc, char **argv) {
             for (cp = optarg ; *cp ; cp++) {
                 if (!isalnum(*cp))
                     errx(1, "bad char in username: %s", optarg);
+            }
+            break;
+        case 'v':
+            match = prefix_num_match(optarg, ':', mii.rank, &optrest);
+            if (match >= 0) {
+                /* allow full string thru to support topology specs */
+                mopt.vcpu = optrest;    /* not just int... */
+                if (strlen(mopt.vcpu) < 1)
+                    rmerror(mii.rank, match, "vcpu: bad -v val=%s",
+                            optrest);
             }
             break;
         case 'w':

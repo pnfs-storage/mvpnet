@@ -618,6 +618,12 @@ void qemucli_gen(struct qemucli_args *qa, struct strvec *tmps,
     if (qa->mopt->kvm && strvec_append(qvec, "-enable-kvm", NULL) != 0)
         mlog_exit(1, MVP_CRIT, "qemuvec setup kvm");
 
+    /* vcpu/smp spec (if provided, otherwise take default of 1) */
+    if (qa->mopt->vcpu != NULL) {
+        if (strvec_append(qvec, "-smp", qa->mopt->vcpu, NULL) != 0)
+            mlog_exit(1, MVP_CRIT, "qemuvec setup vcpu/smp");
+    }
+
     /* guest memory size */
     snprintf(mbuf, sizeof(mbuf), "%dM", qa->mopt->mem_mb);
     if (strvec_append(qvec, "-m", mbuf, NULL) != 0)

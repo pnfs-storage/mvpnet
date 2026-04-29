@@ -79,6 +79,7 @@ struct mvpopts {
     char *stderrpri_ml;    /* stderr mlog priority */
     char *tftpdir;         /* tftp dir (enables tftpd) */
     char *username;        /* username to login to on guest */
+    char *vcpu;            /* virtual cpu smp config */
     int wraplog;           /* enable monwrap log file */
     char *xmask_ml;        /* mlog mask */
 };
