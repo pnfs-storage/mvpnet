@@ -1,6 +1,8 @@
 ### `cloud-init` configuration
 
-Here is an example of how to use the `cloud-init` configuration system with mvpnet.
+Here is an example of how to use the `cloud-init` configuration system
+with mvpnet.  These instructions assume that `mvpnet` has already been
+compiled and installed somewhere in your `$PATH`.
 
 First, download a cloud-init image.  Here we use a CentOS Stream 9 image from:
 https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2
@@ -74,10 +76,32 @@ VM instantiation.
 The second, `mvpnet-init`, configures the special mvpnet network interface in
 the VM and is invoked after every boot.
 
+Some RHEL-like distributions like Rocky Linux have removed FAT support
+from their packaged qemu distribution.   In this case, you need
+to load the contents of cloudcfg into its own ISO disk image
+like this:
+
+```
+# if `genisoimage` is not installed, add it:
+sudo dnf install genisoimage
+
+cd cloud-seed
+genisoimage -output ../cloud-seed.iso -volid cidata -joliet -rock *
+cd ..
+```
+
+In this case, you will also need to modify the commands below to
+use `-c /tmp/cloud-seed.iso` instead.
+
 Finally, start up 4 VMs on two different hosts, `h0` and `h1`, with `mpirun.mpich`:
 ```
-mpirun.mpich -n 4 -host h0,h1 -ppn 1         ./mvpnet/mvpnet -C 1 -c ~/cloud-seed         -j 13 -l /tmp/mvpnet/log         -M ./monwrap/monwrap -r /tmp/mvpnet/run -s /tmp/mvpnet/sock -t /tmp/mvpnet/tftpd -w 1         -g -L 1 -D INFO -S INFO         -n dgram foo -i /l0/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2,mvpctl=s
+mpirun.mpich -n 4 -host h0,h1 -ppn 1 mvpnet -C 1 -c ~/cloud-seed -w 1 -g -L 1 -D INFO -S INFO -i /l0/images/CentOS-Stream-GenericCloud-x86_64-9-20250707.0.x86_64.qcow2,mvpctl=s
 ```
+
+NOTE: On some systems, like Rocky Linux, the `qemu-kvm` program may
+be installed in a non-standard location.  You may also need to supply
+the path to this program with, e.g., `-q /usr/libexec/qemu-kvm` in the
+command above.
 
 After successful startup, you can access the first VM via ssh on `h0`:
 ```

@@ -9,7 +9,9 @@ to create a disk image from scratch.
 
 This document provides a minimal demo of how an existing Ubuntu cloud-init
 based image can be prepared for use with the current version of mvpnet.
-More extensive customization instructions are beyond the scope of this tool.
+More extensive customization instructions are beyond the scope of
+this tool.  These instructions assume that `mvpnet` has already been
+compiled and installed somewhere in your `$PATH`
 
 1. Download a cloud-init enabled image from https://cloud-images.ubuntu.com/ ...
 for example, an Ubuntu 24.04 image can can found here:
@@ -65,6 +67,21 @@ files in it.
 
     The cloud-init image will mount this directory as a virtual FAT
     filesystem and load the configuration from these files.
+
+    Some RHEL-like distributions like Rocky Linux have removed FAT support
+    from their packaged qemu distribution.   In this case, you need
+    to load the contents of cloudcfg into its own ISO disk image
+    like this:
+
+    # if `genisoimage` is not installed, add it:
+    sudo dnf install genisoimage
+
+    cd /tmp/prep/cloudcfg
+    genisoimage -output ../cloud-seed.iso -volid cidata -joliet -rock *
+    cd ..
+
+    In this case, you will also need to modify the commands below to
+    use `-c /tmp/prep/cloud-seed.iso` instead.
 
 1. Boot the above image directly in qemu with the cloud configuration in order
 to do more customization within the running VM:
@@ -138,17 +155,17 @@ need, you hopefully won't need external internet access anymore.
 1. Assuming you've compiled mvpnet and put it in your path, you
 can start a 2 node mvpnet test job with something like:
     ```
-    mkdir -p /tmp/mvp
-
     exec mpirun -n 2 \
-	    ./mvpnet/mvpnet -C 1 \
+	    mvpnet -C 1 \
 	    -c /tmp/prep/cloudcfg \
 	    -i /tmp/prep/ub24-min.img,mvpctl=s \
-	    -l /tmp/mvp \
-	    -M ./monwrap/monwrap -r /tmp/mvp -s /tmp/mvp  \
-            -g -L 1 -D INFO -S INFO \
-	    -n dgram foo
+	    -g -L 1 -D INFO -S INFO
     ```
+
+    NOTE: On some systems, like Rocky Linux, the `qemu-kvm` program
+    may be installed in a non-standard location.  You may also need to
+    supply the path to this program with, e.g., `-q /usr/libexec/qemu-kvm`
+    in the command above.
 
     You can login to the first VM on the host system using "ssh -p 2200 localhost"
     and login to the second VM using "ssh -p 2201 localhost" on the host system.
