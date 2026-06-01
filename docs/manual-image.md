@@ -73,12 +73,14 @@ files in it.
     to load the contents of cloudcfg into its own ISO disk image
     like this:
 
+    ```
     # if `genisoimage` is not installed, add it:
     sudo dnf install genisoimage
 
     cd /tmp/prep/cloudcfg
     genisoimage -output ../cloud-seed.iso -volid cidata -joliet -rock *
     cd ..
+    ```
 
     In this case, you will also need to modify the commands below to
     use `-c /tmp/prep/cloud-seed.iso` instead.
