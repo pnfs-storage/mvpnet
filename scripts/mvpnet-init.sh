@@ -65,17 +65,6 @@ else
   die "don't know how to get network config on this system"
 fi
 
-# workaround the default rule established if dracut-network is enabled
-if [ -f /run/systemd/network/zzzz-dracut-default.network ]; then
-  cat > /run/systemd/network/10-mvpnet-ens3.network << EOF
-[Match]
-Name=ens3
-
-[Link]
-Unmanaged=yes
-EOF
-fi
-
 eval $(getmacs | while read iface mac; do
   if (echo ${mac} | grep -q "^52:56"); then
     echo wsize=$(mvpmac2rank $(echo ${mac} | cut -f4-6 -d":"))
@@ -134,6 +123,17 @@ if [ -n ${mvpiface} ]; then
   fi
   echo "ensuring ${mvpiface} is up"
   ifup ${mvpiface}
+  # workaround the default rule established if dracut-network is enabled
+  if [ -f /run/systemd/network/zzzz-dracut-default.network ]; then
+    echo "adding dracut-network default configuration workaround for ${mvpiface}"
+    cat > /run/systemd/network/10-mvpnet-${mvpiface}.network << EOF
+[Match]
+Name=${mvpiface}
+
+[Link]
+Unmanaged=yes
+EOF
+  fi
 fi
 
 echo "mvpnet-init done!"
